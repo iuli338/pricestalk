@@ -1,26 +1,22 @@
-"""24h re-scout: refresh pinned prices and surface new listings as suggestions."""
+"""24h re-fetch of pinned listing prices (detect price drops)."""
 import threading
+from datetime import datetime, timezone
 
 from apscheduler.schedulers.background import BackgroundScheduler
 
 import storage
 import scraper
 
-_notifications = []  # in-memory feed of new suggestions
-_notif_lock = threading.Lock()
+_notifications = []  # price-drop feed
+_lock = threading.Lock()
 
 
-def _notify(product, new_items):
-    with _notif_lock:
-        _notifications.append({
-            "product_id": product["id"],
-            "query": product["query"],
-            "count": len(new_items),
-        })
+def _now():
+    return datetime.now(timezone.utc).isoformat()
 
 
 def get_notifications(clear=False):
-    with _notif_lock:
+    with _lock:
         items = list(_notifications)
         if clear:
             _notifications.clear()
@@ -28,21 +24,23 @@ def get_notifications(clear=False):
 
 
 def refresh_product(product):
-    """Re-fetch pinned prices and scout for new listings."""
-    # Update existing pinned listings.
+    """Re-fetch each pinned listing's price; record drops."""
     for l in product["listings"]:
+        if not l.get("url"):
+            continue
+        old = l.get("price")
         res = scraper.fetch_price(l["url"])
-        fields = {"last_checked": _iso_now()}
-        if "price" in res:
+        fields = {"last_checked": _now()}
+        if "price" in res and res["price"] is not None:
             fields["price"] = res["price"]
+            if old and res["price"] < old:
+                with _lock:
+                    _notifications.append({
+                        "product_id": product["id"], "query": product["query"],
+                        "site": l.get("site"), "old": old, "new": res["price"],
+                    })
         fields["available"] = res.get("available", l.get("available", True))
         storage.update_listing(product["id"], l["url"], fields)
-
-    # Scout for new listings of the same query.
-    found = scraper.search(product["query"])
-    suggestions = storage.set_suggestions(product["id"], found)
-    if suggestions:
-        _notify(product, suggestions)
 
 
 def refresh_all():
@@ -50,13 +48,8 @@ def refresh_all():
         refresh_product(product)
 
 
-def _iso_now():
-    from datetime import datetime, timezone
-    return datetime.now(timezone.utc).isoformat()
-
-
 def start():
     sched = BackgroundScheduler(daemon=True)
-    sched.add_job(refresh_all, "interval", hours=24, id="rescout")
+    sched.add_job(refresh_all, "interval", hours=24, id="refetch")
     sched.start()
     return sched

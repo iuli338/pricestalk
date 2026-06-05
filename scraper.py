@@ -1,28 +1,32 @@
-"""Web scraping for Romanian retail sites.
+"""Web scraping for Romanian retail sites (eMAG, Altex, Compari).
 
-Two responsibilities:
-  - search(query): scout listings for a query term (used on add + re-scout).
-  - fetch_price(url): re-fetch the current price/availability of a pinned URL.
+Responsibilities:
+  - scout_all(query): search all sites, grouped per site (used by the wizard).
+  - search_emag / search_altex / search_compari: per-site scouting.
+  - fetch_price(url): re-fetch current price/availability of a pinned URL.
 
-Primary source is eMAG.ro (dominant RO retailer). A generic JSON-LD / meta-tag
-price extractor handles arbitrary pinned URLs from other sites.
+Methods (see study/FINDINGS.md):
+  - eMAG: server-rendered HTML, plain requests.
+  - Altex: JSON API fenrir.altex.ro/v2/catalog/search via curl_cffi (TLS block).
+  - Compari: HTML, plain requests. Price-signal only (no real pinnable link).
 """
 import re
 import json
-from urllib.parse import quote_plus, urlparse
+from urllib.parse import quote_plus, quote, urlparse
 
 import requests
 from bs4 import BeautifulSoup
+from curl_cffi import requests as creq
 
+UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+      "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
 HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
-    ),
+    "User-Agent": UA,
     "Accept-Language": "ro-RO,ro;q=0.9,en;q=0.8",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Encoding": "gzip, deflate",  # no 'br' (brotli not guaranteed)
 }
-TIMEOUT = 15
+TIMEOUT = 20
 
 
 def _site_of(url):
@@ -30,7 +34,7 @@ def _site_of(url):
 
 
 def _parse_ron(text):
-    """Extract a RON price from messy text like '4.299,99 Lei' -> 4299.99."""
+    """Parse a RON price from messy text like '4.299,99 Lei' or '6 097,49 RON'."""
     if not text:
         return None
     text = text.replace("\xa0", " ")
@@ -38,72 +42,211 @@ def _parse_ron(text):
     if not m:
         return None
     raw = m.group(1).strip().replace(" ", "")
-    # Romanian format: '.' thousands, ',' decimals
     if "," in raw:
         raw = raw.replace(".", "").replace(",", ".")
-    else:
-        raw = raw.replace(".", "") if raw.count(".") > 1 else raw
+    elif raw.count(".") > 1:
+        raw = raw.replace(".", "")
     try:
         return round(float(raw), 2)
     except ValueError:
         return None
 
 
-def _get(url):
-    return requests.get(url, headers=HEADERS, timeout=TIMEOUT)
-
-
 # --------------------------------------------------------------------------
-# eMAG search (scouting)
+# eMAG (HTML, plain requests)
 # --------------------------------------------------------------------------
 
-def search_emag(query, limit=12):
-    """Scrape eMAG search results for a query. Returns list of listing dicts."""
+def search_emag(query, limit=24):
     url = f"https://www.emag.ro/search/{quote_plus(query)}"
-    results = []
+    out = []
     try:
-        resp = _get(url)
-        resp.raise_for_status()
+        r = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
+        r.raise_for_status()
     except requests.RequestException:
-        return results
+        return out
 
-    soup = BeautifulSoup(resp.text, "html.parser")
-    cards = soup.select("div.card-item, div.card-v2")
-    for card in cards:
-        link = card.select_one("a.card-v2-title, a.js-product-url, h2 a, a[data-zone='title']")
+    soup = BeautifulSoup(r.text, "html.parser")
+    seen = set()
+    for card in soup.select("div.card-item, div.card-v2"):
+        link = card.select_one("a.card-v2-title")  # product-name anchor (not the badge)
         if not link or not link.get("href"):
             continue
-        href = link["href"]
+        href = link["href"].split("?")[0]
         if href.startswith("/"):
             href = "https://www.emag.ro" + href
-        title = link.get_text(strip=True) or card.get("data-name", "")
-
-        price_el = card.select_one("p.product-new-price, span.product-new-price, .product-new-price")
+        if href in seen:
+            continue
+        title = link.get_text(strip=True)
+        price_el = card.select_one("p.product-new-price")
         price = _parse_ron(price_el.get_text(" ", strip=True)) if price_el else None
         if not title or price is None:
             continue
+        img_el = card.select_one("img")
+        image = img_el.get("src") or img_el.get("data-src") if img_el else None
+        seen.add(href)
+        out.append({
+            "url": href, "title": title, "price": price,
+            "currency": "RON", "site": "emag.ro", "image": image,
+            "available": True, "pinnable": True,
+        })
+        if len(out) >= limit:
+            break
+    return out
 
-        results.append({
-            "url": href.split("?")[0],
-            "title": title,
+
+# --------------------------------------------------------------------------
+# Altex (JSON API, curl_cffi)
+# --------------------------------------------------------------------------
+
+def search_altex(query, limit=24):
+    out = []
+    try:
+        s = creq.Session(impersonate="chrome")
+        s.headers.update({
+            "User-Agent": UA,
+            "Accept": "application/json, text/plain, */*",
+            "Accept-Language": "ro-RO,ro;q=0.9",
+            "Referer": "https://altex.ro/",
+        })
+        url = f"https://fenrir.altex.ro/v2/catalog/search/{quote(query)}?size={limit}"
+        r = s.get(url, timeout=TIMEOUT)
+        r.raise_for_status()
+        data = r.json()
+    except Exception:
+        return out
+
+    for p in data.get("products", []):
+        if not p.get("url_key") or not p.get("sku"):
+            continue
+        img = p.get("image")
+        if img and img.startswith("/"):
+            img = "https://lcdn.altex.ro/resize/media/catalog/product" + img.split("/media/catalog/product", 1)[-1] \
+                if "/media/catalog/product" in img else "https://lcdn.altex.ro" + img
+        out.append({
+            "url": f"https://altex.ro/{p['url_key']}/cpd/{p['sku']}/",
+            "title": p.get("name"),
+            "price": p.get("price"),
+            "currency": "RON",
+            "site": "altex.ro",
+            "image": img,
+            "available": bool(p.get("stock_status") == 1 or p.get("pickup_is_in_stock")),
+            "pinnable": True,
+        })
+        if len(out) >= limit:
+            break
+    return out
+
+
+# --------------------------------------------------------------------------
+# Compari (HTML, price-signal only — not pinnable)
+# --------------------------------------------------------------------------
+
+def search_compari(query, limit=24):
+    out = []
+    try:
+        s = requests.Session()
+        s.headers.update(HEADERS)
+        s.get("https://www.compari.ro/", timeout=TIMEOUT)  # warm Cloudflare cookies
+        url = "https://www.compari.ro/CategorySearch.php?st=" + quote_plus(query)
+        r = s.get(url, timeout=TIMEOUT)
+        r.raise_for_status()
+    except requests.RequestException:
+        return out
+
+    soup = BeautifulSoup(r.text, "html.parser")
+    for box in soup.select(".product-box"):
+        name = box.select_one(".name")
+        price_el = box.select_one(".price")
+        if not name or not price_el:
+            continue
+        price = _parse_ron(price_el.get_text(" ", strip=True))
+        if price is None:
+            continue
+        img_el = box.select_one("img")
+        image = (img_el.get("src") or img_el.get("data-src")) if img_el else None
+        out.append({
+            "url": None,  # Compari is a redirect aggregator; no stable pinnable link
+            "title": name.get_text(" ", strip=True),
             "price": price,
             "currency": "RON",
-            "site": "emag.ro",
+            "site": "compari.ro",
+            "image": image,
             "available": True,
+            "pinnable": False,
         })
-        if len(results) >= limit:
+        if len(out) >= limit:
             break
-    return results
-
-
-def search(query, limit=12):
-    """Aggregate search across supported sites."""
-    return search_emag(query, limit=limit)
+    return out
 
 
 # --------------------------------------------------------------------------
-# Generic price fetch for a pinned URL
+# Aggregate (wizard) + single-URL price refetch
 # --------------------------------------------------------------------------
+
+SITES = ["emag", "altex", "compari"]
+_SEARCHERS = {"emag": search_emag, "altex": search_altex, "compari": search_compari}
+
+
+def scout_all(query, limit=24):
+    """Search all sites. Returns {site: [listings...]} in wizard order."""
+    return {site: _SEARCHERS[site](query, limit=limit) for site in SITES}
+
+
+def fetch_price(url):
+    """Re-fetch price + availability for a pinned URL (eMAG or Altex)."""
+    site = _site_of(url)
+
+    if "altex.ro" in site:
+        return _fetch_altex_price(url)
+
+    # eMAG / generic HTML.
+    try:
+        r = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
+        r.raise_for_status()
+    except requests.RequestException as e:
+        return {"error": str(e), "available": False}
+    soup = BeautifulSoup(r.text, "html.parser")
+    title = soup.title.get_text(strip=True) if soup.title else None
+
+    if "emag.ro" in site:
+        el = soup.select_one("p.product-new-price")
+        price = _parse_ron(el.get_text(" ", strip=True)) if el else None
+        oos = bool(soup.select_one(".label-out_of_stock, .product-out-of-stock"))
+        if price is not None:
+            return {"price": price, "currency": "RON", "available": not oos, "title": title}
+
+    price, avail = _from_jsonld(soup)
+    if price is None:
+        price = _from_meta(soup)
+        avail = price is not None
+    if price is not None:
+        return {"price": round(price, 2), "currency": "RON", "available": bool(avail), "title": title}
+    return {"error": "price not found", "available": False, "title": title}
+
+
+def _fetch_altex_price(url):
+    """Altex product page: price from meta-description 'pretul de X lei' via curl_cffi."""
+    try:
+        s = creq.Session(impersonate="chrome")
+        s.headers.update({"User-Agent": UA, "Accept-Language": "ro-RO,ro;q=0.9"})
+        r = s.get(url, timeout=TIMEOUT)
+        r.raise_for_status()
+    except Exception as e:
+        return {"error": str(e), "available": False}
+    html = r.text
+    m = re.search(r"pretul de ([\d.]+)\s*lei", html, re.I)
+    price = float(m.group(1)) if m else None
+    soup = BeautifulSoup(html, "html.parser")
+    title = soup.title.get_text(strip=True) if soup.title else None
+    if price is None:
+        el = soup.select_one('[class*="Price"]')
+        if el:
+            price = _parse_ron(el.get_text(strip=True))
+    avail = "InStock" in html or "in stoc" in html.lower()
+    if price is not None:
+        return {"price": round(price, 2), "currency": "RON", "available": avail, "title": title}
+    return {"error": "price not found", "available": False, "title": title}
+
 
 def _from_jsonld(soup):
     for tag in soup.find_all("script", type="application/ld+json"):
@@ -136,41 +279,3 @@ def _from_meta(soup):
             if p is not None:
                 return p
     return None
-
-
-def fetch_price(url):
-    """Fetch current price + availability for a pinned URL.
-
-    Returns {price, currency, available, title?} or {error:...}.
-    """
-    try:
-        resp = _get(url)
-        resp.raise_for_status()
-    except requests.RequestException as e:
-        return {"error": str(e), "available": False}
-
-    soup = BeautifulSoup(resp.text, "html.parser")
-    site = _site_of(url)
-    title = None
-    if soup.title:
-        title = soup.title.get_text(strip=True)
-
-    # eMAG product page has a stable price element.
-    if "emag.ro" in site:
-        el = soup.select_one("p.product-new-price")
-        price = _parse_ron(el.get_text(" ", strip=True)) if el else None
-        out_of_stock = bool(soup.select_one(".label-out_of_stock, .product-out-of-stock"))
-        if price is not None:
-            return {"price": price, "currency": "RON",
-                    "available": not out_of_stock, "title": title}
-
-    # Generic structured-data path.
-    price, avail = _from_jsonld(soup)
-    if price is None:
-        price = _from_meta(soup)
-        avail = price is not None
-    if price is not None:
-        return {"price": round(price, 2), "currency": "RON",
-                "available": bool(avail), "title": title}
-
-    return {"error": "price not found", "available": False, "title": title}
