@@ -65,31 +65,6 @@ def api_draft(did):
     return jsonify(draft)
 
 
-@app.route("/api/drafts/<did>/pin", methods=["POST"])
-def api_pin(did):
-    listing = request.json or {}
-    if not listing.get("url"):
-        return jsonify({"error": "url required"}), 400
-    res = storage.pin_to_draft(did, listing)
-    if res is None:
-        return jsonify({"error": "duplicate or draft not found"}), 409
-    return jsonify(res), 201
-
-
-@app.route("/api/drafts/<did>/unpin", methods=["POST"])
-def api_unpin(did):
-    url = (request.json or {}).get("url", "")
-    return jsonify({"removed": storage.unpin_from_draft(did, url)})
-
-
-@app.route("/api/drafts/<did>/finalize", methods=["POST"])
-def api_finalize(did):
-    product = storage.finalize_draft(did)
-    if not product:
-        return jsonify({"error": "not found"}), 404
-    return jsonify(_decorate(product)), 201
-
-
 @app.route("/api/drafts/<did>", methods=["DELETE"])
 def api_discard(did):
     return jsonify({"discarded": storage.discard_draft(did)})
@@ -100,6 +75,28 @@ def api_discard(did):
 @app.route("/api/products")
 def api_products():
     return jsonify([_decorate(p) for p in storage.list_products()])
+
+
+@app.route("/api/products", methods=["POST"])
+def api_create():
+    """Create a product from a query + a list of pinned listings."""
+    body = request.json or {}
+    query = (body.get("query") or "").strip()
+    listings = body.get("listings") or []
+    if not query:
+        return jsonify({"error": "query required"}), 400
+    product = storage.create_product(query, listings)
+    return jsonify(_decorate(product)), 201
+
+
+@app.route("/api/products/<pid>/links", methods=["POST"])
+def api_add_links(pid):
+    """Append a list of pinned listings to an existing product (dedup by URL)."""
+    listings = (request.json or {}).get("listings") or []
+    product = storage.add_listings(pid, listings)
+    if not product:
+        return jsonify({"error": "not found"}), 404
+    return jsonify(_decorate(product))
 
 
 @app.route("/api/products/<pid>")
@@ -136,16 +133,6 @@ def api_refresh(pid):
         return jsonify({"error": "not found"}), 404
     scheduler.refresh_product(p)
     return jsonify(_decorate(storage.get_product(pid)))
-
-
-@app.route("/api/products/<pid>/append", methods=["POST"])
-def api_append(pid):
-    """Append a draft's pinned listings to an existing product (Add links wizard)."""
-    draft_id = (request.json or {}).get("draft_id", "")
-    product = storage.append_draft_to_product(pid, draft_id)
-    if not product:
-        return jsonify({"error": "not found"}), 404
-    return jsonify(_decorate(product)), 200
 
 
 @app.route("/api/products/<pid>/listings", methods=["DELETE"])

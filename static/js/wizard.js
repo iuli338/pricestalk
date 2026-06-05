@@ -1,8 +1,11 @@
-// Scout wizard: search 3 sites, pin per step, then finalize.
+// Scout wizard: search 3 sites, pin/unpin LOCALLY, then send the final list once.
 //
 // Two modes:
-//   create  -> finalize the draft into a NEW product entity
-//   append  -> add the pinned links to an EXISTING product (opts.productId)
+//   create -> POST /api/products with the pinned listings (new entity)
+//   append -> POST /api/products/<id>/links with the pinned listings
+//
+// Pinning is entirely client-side (wizard.pinned: Map<url, listing>). The draft
+// on the server only holds scout results; it is discarded at the end.
 import { api } from './api.js';
 import { $, esc } from './dom.js';
 import { fmt } from './format.js';
@@ -25,19 +28,19 @@ export const onWizardDone = fn => { afterFinalize = fn; };
 export async function startCreateWizard(query) {
   openWizardLoading(query);
   const draft = await api.scout(query);
-  setWizard({ draft, step: 0, pinned: new Set(), mode: 'create' });
+  setWizard({ draft, step: 0, mode: 'create', pinned: new Map(), preexisting: new Set() });
   renderWizard();
 }
 
 // start an "add links" wizard for an existing product.
-// existingUrls = links already pinned to the product (shown as already pinned).
+// existingUrls = links already on the product (shown as 'Already added').
 export async function startAppendWizard(query, productId, existingUrls = []) {
   openWizardLoading(query);
   const draft = await api.scout(query);
   setWizard({
     draft, step: 0, mode: 'append', productId,
-    pinned: new Set(existingUrls),         // links already on the product
-    preexisting: new Set(existingUrls),    // can't be unpinned from here
+    pinned: new Map(),                     // newly pinned this session
+    preexisting: new Set(existingUrls),    // already on the product
   });
   renderWizard();
 }
@@ -70,7 +73,8 @@ const ACTIONS = {
   cancel: () => cancelWizard(),
   back:   () => { wizard.step--; renderWizard(); },
   next:   () => { wizard.step++; renderWizard(); },
-  pin:    (el) => wizPin(JSON.parse(el.dataset.listing), el),
+  pin:    (el) => wizPin(wizard.current[+el.dataset.idx]),
+  unpin:  (el) => wizUnpin(wizard.current[+el.dataset.idx]),
   finalize: () => finalizeWizard(),
 };
 
@@ -79,8 +83,9 @@ function renderWizard() {
 
   const step = STEPS[wizard.step];
   const items = [...(wizard.draft.results[step.key] || [])].sort(byPriceAsc);
+  wizard.current = items;   // index referenced by data-idx (avoids JSON in attrs)
   const cards = items.length
-    ? items.map(it => listingCard(it, step.pinnable)).join('')
+    ? items.map((it, i) => listingCard(it, i, step.pinnable)).join('')
     : `<p class="muted">${t('wizard.no_results', { site: step.label })}</p>`;
   const note = step.pinnable ? t('wizard.pin_note') : t('wizard.compari_note');
   const last = wizard.step === STEPS.length - 1;
@@ -99,7 +104,7 @@ function renderWizard() {
     </div>`, { dismissable: true, onDismiss: cancelWizard, actions: ACTIONS });
 }
 
-function listingCard(it, pinnable) {
+function listingCard(it, idx, pinnable) {
   const pinned = it.url && wizard.pinned.has(it.url);
   const already = it.url && wizard.preexisting && wizard.preexisting.has(it.url);
   const oos = it.available === false;
@@ -111,9 +116,11 @@ function listingCard(it, pinnable) {
     pinBtn = `<span class="lc-ref">${t('wizard.market_price')}</span>`;
   } else if (already) {
     pinBtn = `<button class="btn btn-sm lc-pin" disabled>${t('wizard.already_added')}</button>`;
+  } else if (pinned) {
+    // pinned this session -> allow unpin
+    pinBtn = `<button class="btn btn-sm lc-pin" data-action="unpin" data-idx="${idx}">${t('wizard.pinned')}</button>`;
   } else {
-    pinBtn = `<button class="btn btn-sm ${pinned ? '' : 'btn-primary'} lc-pin" ${pinned ? 'disabled' : ''}
-         data-action="pin" data-listing='${esc(JSON.stringify(it))}'>${pinned ? t('wizard.pinned') : t('wizard.pin')}</button>`;
+    pinBtn = `<button class="btn btn-sm btn-primary lc-pin" data-action="pin" data-idx="${idx}">${t('wizard.pin')}</button>`;
   }
   return `
     <div class="lc${oos ? ' lc-oos' : ''}${already ? ' lc-added' : ''}">
@@ -124,16 +131,19 @@ function listingCard(it, pinnable) {
     </div>`;
 }
 
-async function wizPin(it, btn) {
-  btn.disabled = true; btn.textContent = '…';
-  const res = await api.pinToDraft(wizard.draft.id, it);
-  if (res && res.url) { wizard.pinned.add(res.url); btn.textContent = t('wizard.pinned'); }
-  else { btn.disabled = false; btn.textContent = t('wizard.pin'); }
+// pin/unpin are local-only: mutate the Map and re-render the step.
+function wizPin(it) {
+  if (it.url) wizard.pinned.set(it.url, it);
+  renderWizard();
 }
 
-async function renderSummary() {
-  const draft = await api.getDraft(wizard.draft.id);
-  const pinned = draft.pinned;
+function wizUnpin(it) {
+  if (it.url) wizard.pinned.delete(it.url);
+  renderWizard();
+}
+
+function renderSummary() {
+  const pinned = [...wizard.pinned.values()];   // local Map -> array
   const bySite = {};
   for (const l of pinned) (bySite[l.site] = bySite[l.site] || []).push(l);
   const minP = Math.min(...pinned.filter(l => l.price > 0).map(l => l.price));
@@ -148,7 +158,7 @@ async function renderSummary() {
     <div class="wz-head">${STEPS.map(s => `<div class="wz-step done">${s.label}</div>`).join('<span class="wz-sep">›</span>')}
       <span class="wz-sep">›</span> <div class="wz-step active">${t('wizard.summary')}</div></div>
     <h2>${t('wizard.review')}</h2>
-    <p class="muted">${t('wizard.summary_meta', { q: esc(draft.query), n: pinned.length })}${pinned.length ? t('wizard.summary_lowest', { price: fmt(minP) }) : ''}</p>
+    <p class="muted">${t('wizard.summary_meta', { q: esc(wizard.draft.query), n: pinned.length })}${pinned.length ? t('wizard.summary_lowest', { price: fmt(minP) }) : ''}</p>
     ${groups}
     <div class="wz-nav">
       <button class="btn" data-action="cancel">${t('wizard.cancel')}</button>
@@ -166,21 +176,24 @@ function summaryRow(l) {
   </div>`;
 }
 
+// send the locally-pinned listings in one call, then discard the scout draft
 async function finalizeWizard() {
-  const mode = wizard.mode, pid = wizard.productId, draftId = wizard.draft.id;
+  const { mode, productId, draft } = wizard;
+  const listings = [...wizard.pinned.values()];
   if (mode === 'append') {
-    await api.appendDraft(pid, draftId);
+    await api.addLinks(productId, listings);
   } else {
-    await api.finalizeDraft(draftId);
+    await api.createProduct(draft.query, listings);
   }
+  api.discardDraft(draft.id);   // fire-and-forget cleanup
   setWizard(null);
   closeModal();
   toast(mode === 'append' ? t('wizard.links_added') : t('wizard.saved'));
-  afterFinalize(mode === 'append' ? pid : null);
+  afterFinalize(mode === 'append' ? productId : null);
 }
 
-async function cancelWizard() {
-  if (wizard) { await api.discardDraft(wizard.draft.id); setWizard(null); }
+function cancelWizard() {
+  if (wizard) { api.discardDraft(wizard.draft.id); setWizard(null); }
   closeModal();
   afterFinalize(null);
 }

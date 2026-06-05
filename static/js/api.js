@@ -10,21 +10,19 @@ const req = (url, method, body) => fetch(url, {
 
 export const api = {
   // products
-  listProducts:   ()        => req('/api/products', 'GET'),
-  getProduct:     (id)      => req(`/api/products/${id}`, 'GET'),
-  updateProduct:  (id, f)   => req(`/api/products/${id}`, 'PATCH', f),
-  deleteProduct:  (id)      => req(`/api/products/${id}`, 'DELETE'),
-  refreshOne:     (id, url) => req(`/api/products/${id}/refresh-one`, 'POST', { url }),
-  removeListing:  (id, url) => req(`/api/products/${id}/listings`, 'DELETE', { url }),
+  listProducts:   ()           => req('/api/products', 'GET'),
+  getProduct:     (id)         => req(`/api/products/${id}`, 'GET'),
+  createProduct:  (query, ls)  => req('/api/products', 'POST', { query, listings: ls }),
+  addLinks:       (id, ls)     => req(`/api/products/${id}/links`, 'POST', { listings: ls }),
+  updateProduct:  (id, f)      => req(`/api/products/${id}`, 'PATCH', f),
+  deleteProduct:  (id)         => req(`/api/products/${id}`, 'DELETE'),
+  refreshOne:     (id, url)    => req(`/api/products/${id}/refresh-one`, 'POST', { url }),
+  removeListing:  (id, url)    => req(`/api/products/${id}/listings`, 'DELETE', { url }),
 
-  // wizard drafts
-  scout:          (query)   => req('/api/scout', 'POST', { query }),
-  getDraft:       (id)      => req(`/api/drafts/${id}`, 'GET'),
-  pinToDraft:     (id, l)   => req(`/api/drafts/${id}/pin`, 'POST', l),
-  finalizeDraft:  (id)      => req(`/api/drafts/${id}/finalize`, 'POST'),
-  appendDraft:    (pid, did) => req(`/api/products/${pid}/append`, 'POST', { draft_id: did }),
-  discardDraft:   (id)      => req(`/api/drafts/${id}`, 'DELETE'),
+  // wizard scout draft (results only; pinning is client-side)
+  scout:          (query)      => req('/api/scout', 'POST', { query }),
+  discardDraft:   (id)         => req(`/api/drafts/${id}`, 'DELETE'),
 
   // misc
-  notifications:  ()        => req('/api/notifications?clear=1', 'GET'),
+  notifications:  ()           => req('/api/notifications?clear=1', 'GET'),
 };

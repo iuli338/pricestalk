@@ -1,9 +1,12 @@
 """JSON-backed storage: wizard drafts + finalized product entities.
 
+Drafts hold scout results only; pinning is client-side. The client sends the
+final listing list on create/add-links.
+
 Schema (data.json):
 {
-  "drafts":   [ {id, query, created_at, results:{emag,altex,compari}, pinned:[listing...]} ],
-  "products": [ {id, query, created_at, listings:[listing...]} ]
+  "drafts":   [ {id, query, created_at, results:{emag,altex,compari}} ],
+  "products": [ {id, query, created_at, listings:[listing...], title?, cover_image?} ]
 }
 A listing: {url, title, price, currency, site, image, available, last_checked}
 """
@@ -56,7 +59,6 @@ def create_draft(query, results):
             "query": query,
             "created_at": _now(),
             "results": results,   # {emag:[...], altex:[...], compari:[...]}
-            "pinned": [],
         }
         data["drafts"].append(draft)
         _save(data)
@@ -68,34 +70,6 @@ def get_draft(draft_id):
         return _find(_load()["drafts"], draft_id)
 
 
-def pin_to_draft(draft_id, listing):
-    """Pin a listing into a draft (skips duplicate URLs)."""
-    with _lock:
-        data = _load()
-        draft = _find(data["drafts"], draft_id)
-        if not draft:
-            return None
-        if listing.get("url") and any(l.get("url") == listing["url"] for l in draft["pinned"]):
-            return None
-        listing = dict(listing)
-        listing["last_checked"] = _now()
-        draft["pinned"].append(listing)
-        _save(data)
-        return listing
-
-
-def unpin_from_draft(draft_id, url):
-    with _lock:
-        data = _load()
-        draft = _find(data["drafts"], draft_id)
-        if not draft:
-            return False
-        before = len(draft["pinned"])
-        draft["pinned"] = [l for l in draft["pinned"] if l.get("url") != url]
-        _save(data)
-        return len(draft["pinned"]) < before
-
-
 def discard_draft(draft_id):
     with _lock:
         data = _load()
@@ -105,44 +79,51 @@ def discard_draft(draft_id):
         return len(data["drafts"]) < before
 
 
-def finalize_draft(draft_id):
-    """Turn a draft's pinned listings into a saved product entity."""
+# ---------------------------------------------------------------- products
+
+def _clean_listing(l):
+    """Keep only the listing fields we persist; stamp last_checked."""
+    out = {k: l.get(k) for k in
+           ("url", "title", "price", "currency", "site", "image", "available")}
+    out["last_checked"] = _now()
+    return out
+
+
+def create_product(query, listings):
+    """Create a product entity from a query + list of pinned listings."""
     with _lock:
         data = _load()
-        draft = _find(data["drafts"], draft_id)
-        if not draft:
-            return None
+        seen, clean = set(), []
+        for l in listings:
+            if l.get("url") and l["url"] not in seen:
+                seen.add(l["url"])
+                clean.append(_clean_listing(l))
         product = {
             "id": uuid.uuid4().hex[:8],
-            "query": draft["query"],
+            "query": query,
             "created_at": _now(),
-            "listings": draft["pinned"],
+            "listings": clean,
         }
         data["products"].append(product)
-        data["drafts"] = [d for d in data["drafts"] if d["id"] != draft_id]
         _save(data)
         return product
 
 
-def append_draft_to_product(product_id, draft_id):
-    """Append a draft's pinned listings to an existing product, then drop the draft."""
+def add_listings(product_id, listings):
+    """Append listings to an existing product, dedup by URL."""
     with _lock:
         data = _load()
         product = _find(data["products"], product_id)
-        draft = _find(data["drafts"], draft_id)
-        if not product or not draft:
+        if not product:
             return None
         existing = {l.get("url") for l in product["listings"]}
-        for l in draft["pinned"]:
-            if l.get("url") not in existing:
-                product["listings"].append(l)
-                existing.add(l.get("url"))
-        data["drafts"] = [d for d in data["drafts"] if d["id"] != draft_id]
+        for l in listings:
+            if l.get("url") and l["url"] not in existing:
+                existing.add(l["url"])
+                product["listings"].append(_clean_listing(l))
         _save(data)
         return product
 
-
-# ---------------------------------------------------------------- products
 
 def list_products():
     with _lock:
