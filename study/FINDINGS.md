@@ -91,6 +91,11 @@ GET https://fenrir.altex.ro/v2/catalog/search/{quote(query)}?size=48
   `regular_price`, `lowest_price`, `sku`, `url_key`, `brand_name`,
   `stock_status` (1=in stock), `pickup_is_in_stock`, `image`, `ean_codes`.
 - **Product URL** = `https://altex.ro/{url_key}/cpd/{sku}/`.
+- **Image URL** = `https://lcdn.altex.ro` + `image` (the `image` field is like
+  `/media/catalog/product/...`). Use the host directly — do NOT prepend
+  `/resize`: `lcdn.altex.ro/resize/media/...` without a resize-hash returns a
+  ~366B loading placeholder, not the real photo. Direct path = real image
+  (AVIF, 20-70KB). Verified.
 - **Availability** = `stock_status == 1 or pickup_is_in_stock`.
 - Verified across `rtx 4060 laptop` (21 items), `iphone 15` (17),
   `monitor 4k 27` (30, with correct OOS flags). Clean, fast, no HTML.

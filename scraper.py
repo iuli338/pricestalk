@@ -118,10 +118,11 @@ def search_altex(query, limit=24):
     for p in data.get("products", []):
         if not p.get("url_key") or not p.get("sku"):
             continue
+        # image is like '/media/catalog/product/...'; prefix the CDN host directly.
+        # Do NOT add '/resize' -- that path without a resize-hash returns a placeholder.
         img = p.get("image")
         if img and img.startswith("/"):
-            img = "https://lcdn.altex.ro/resize/media/catalog/product" + img.split("/media/catalog/product", 1)[-1] \
-                if "/media/catalog/product" in img else "https://lcdn.altex.ro" + img
+            img = "https://lcdn.altex.ro" + img
         out.append({
             "url": f"https://altex.ro/{p['url_key']}/cpd/{p['sku']}/",
             "title": p.get("name"),
