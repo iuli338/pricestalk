@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PriceStalk — Disclaimer</title>
+  <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+  <script>
+    (function(){ var t = localStorage.getItem('theme'); if(t) document.documentElement.setAttribute('data-theme', t); })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap">
+  <link rel="stylesheet" href="{{ url_for('static', filename='tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/legal.css') }}">
+</head>
+<body>
+  <main class="legal">
+    <a class="legal-brand" href="/">Price<span class="accent">Stalk</span></a>
+
+    <h1 data-i18n="legal.title">Disclaimer</h1>
+
+    <p data-i18n="legal.p1">Non-commercial, personal project for learning and personal price
+      tracking. Not for profit. Not affiliated with or endorsed by any retailer.</p>
+
+    <p data-i18n="legal.p2">It reads only publicly available pages and prices, at low frequency,
+      for each user's personal use. No access controls are bypassed; no bulk data is stored,
+      resold, or redistributed.</p>
+
+    <p data-i18n="legal.p3">If you represent a referenced site and want PriceStalk to stop
+      accessing it, contact me. I will comply promptly and can disable any site — or shut the
+      project down — at any time.</p>
+
+    <div class="legal-contact">
+      <span data-i18n="legal.contact">Contact:</span>
+      <a href="mailto:naive.julian@gmail.com">naive.julian@gmail.com</a>
+    </div>
+
+    <div class="legal-actions">
+      <a class="btn" href="/" data-i18n="legal.back">Back</a>
+      <span class="legal-lang">
+        <select id="langSelect" class="lang-select" title="Language">
+          <option value="en">EN</option>
+          <option value="ro">RO</option>
+        </select>
+      </span>
+    </div>
+  </main>
+
+  <script type="module" src="{{ url_for('static', filename='js/legal.js') }}"></script>
+</body>
+</html>

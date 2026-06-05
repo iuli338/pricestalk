@@ -71,3 +71,5 @@ split by concern, JS is ES modules wired in `main.js`. UI uses `data-action`
 event delegation (no inline handlers); all API calls go through `js/api.js`.
 
 Region: Romania · Currency: RON · Language: English + Romanian (switchable in the header). Scraping is best-effort; selectors may need updates over time.
+
+Non-commercial personal project. See [DISCLAIMER.md](DISCLAIMER.md) — site owners can request exclusion at naive.julian@gmail.com.

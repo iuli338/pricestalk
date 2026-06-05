@@ -153,3 +153,29 @@ main { max-width: var(--maxw); margin: 0 auto; padding: var(--s-6) var(--s-5); }
 .muted { color: var(--txt-mut); }
 .row { display: flex; gap: var(--s-2); flex-wrap: wrap; }
 .empty { color: var(--txt-mut); text-align: center; padding: var(--s-7) 0; }
+
+/* --- Footer --- */
+.site-footer {
+  text-align: center;
+  padding: var(--s-5);
+  margin-top: var(--s-5);
+}
+.site-footer a {
+  color: var(--txt-mut);
+  font-size: var(--fs-sm);
+  text-decoration: none;
+}
+.site-footer a:hover { color: var(--red); }
+
+/* fixed minimalist footer (home) — always pinned to the bottom */
+.site-footer-fixed {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  margin-top: 0;
+  padding: var(--s-2);
+  background: var(--bg);
+  border-top: 1px solid var(--line);
+  z-index: 10;
+}
+/* keep page content clear of the fixed footer */
+body:has(.site-footer-fixed) main { padding-bottom: var(--s-7); }

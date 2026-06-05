@@ -28,6 +28,11 @@ def register_routes(app):
     def index():
         return render_template("index.html")
 
+    @app.route("/disclaimer")
+    def disclaimer():
+        # public — site owners must be able to read it without an account
+        return render_template("disclaimer.html")
+
     # ----------------------------------------------------------- wizard
 
     @app.route("/api/scout", methods=["POST"])

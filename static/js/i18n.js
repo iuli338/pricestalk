@@ -9,6 +9,14 @@ const I18N = {
     "profile.email": "Email",
     "profile.joined": "Joined",
 
+    "footer.disclaimer": "Disclaimer",
+    "legal.title": "Disclaimer",
+    "legal.p1": "Non-commercial, personal project for learning and personal price tracking. Not for profit. Not affiliated with or endorsed by any retailer.",
+    "legal.p2": "It reads only publicly available pages and prices, at low frequency, for each user's personal use. No access controls are bypassed; no bulk data is stored, resold, or redistributed.",
+    "legal.p3": "If you represent a referenced site and want PriceStalk to stop accessing it, contact me. I will comply promptly and can disable any site — or shut the project down — at any time.",
+    "legal.contact": "Contact:",
+    "legal.back": "Back",
+
     "auth.tagline": "Track the lowest price across Romanian shops.",
     "auth.login": "Sign in",
     "auth.register": "Create account",
@@ -96,6 +104,14 @@ const I18N = {
     "profile.nickname": "Nume",
     "profile.email": "Email",
     "profile.joined": "Înregistrat",
+
+    "footer.disclaimer": "Disclaimer",
+    "legal.title": "Disclaimer",
+    "legal.p1": "Proiect personal, non-comercial, pentru învățare și urmărirea personală a prețurilor. Fără scop comercial. Neafiliat și neaprobat de niciun retailer.",
+    "legal.p2": "Citește doar pagini și prețuri public disponibile, la frecvență joasă, pentru uzul personal al fiecărui utilizator. Nu ocolește niciun control de acces; nu stochează, revinde sau redistribuie date în masă.",
+    "legal.p3": "Dacă reprezentați un site referențiat și doriți ca PriceStalk să nu îl mai acceseze, contactați-mă. Voi da curs cererii prompt și pot dezactiva orice site — sau opri complet proiectul — oricând.",
+    "legal.contact": "Contact:",
+    "legal.back": "Înapoi",
 
     "auth.tagline": "Urmărește cel mai mic preț din magazinele românești.",
     "auth.login": "Autentificare",

@@ -1,0 +1,40 @@
+/* Legal / disclaimer page. */
+
+.legal {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: var(--s-7) var(--s-5);
+}
+.legal-brand {
+  display: inline-block;
+  font-size: var(--fs-lg); font-weight: var(--fw-bold); letter-spacing: -.02em;
+  color: var(--txt); text-decoration: none;
+  margin-bottom: var(--s-5);
+}
+.legal-brand .accent { color: var(--red); }
+
+.legal h1 {
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-bold);
+  margin: 0 0 var(--s-4);
+}
+.legal p {
+  color: var(--txt);
+  line-height: 1.65;
+  margin: 0 0 var(--s-4);
+}
+
+.legal-contact {
+  margin: var(--s-5) 0;
+  padding: var(--s-4);
+  background: var(--bg-2);
+  border-left: 3px solid var(--red);
+  border-radius: var(--r);
+}
+.legal-contact a { color: var(--red); font-weight: var(--fw-med); text-decoration: none; }
+.legal-contact a:hover { text-decoration: underline; }
+
+.legal-actions {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: var(--s-5);
+}
