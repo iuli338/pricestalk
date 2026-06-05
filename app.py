@@ -4,7 +4,7 @@ from flask_login import login_required, current_user
 
 from config import Config
 from models import init_db
-from presenter import decorate, min_price
+from presenter import decorate, summarize, min_price
 from auth import login_manager, auth_bp, init_login
 import storage
 import scraper
@@ -59,7 +59,8 @@ def register_routes(app):
     @app.route("/api/products")
     @login_required
     def api_products():
-        return jsonify([decorate(p) for p in storage.list_products(current_user.id)])
+        # Lightweight card data only (no full listings) for the home grid.
+        return jsonify([summarize(s) for s in storage.list_product_summaries(current_user.id)])
 
     @app.route("/api/products", methods=["POST"])
     @login_required

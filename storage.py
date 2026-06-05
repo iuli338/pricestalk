@@ -10,7 +10,7 @@ import threading
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, func, case
 
 from models import SessionLocal, Product, Listing, User
 
@@ -113,6 +113,40 @@ def list_products(user_id):
             .order_by(Product.created_at.desc())
         ).all()
         return [p.to_dict() for p in rows]
+
+
+def list_product_summaries(user_id):
+    """Lightweight card data per product, aggregated in SQL (no full listings).
+
+    Returns dicts with: id, title, query, cover_image, min_price, listing_count.
+    min_price = cheapest in-stock priced listing; cover = product cover or any image.
+    """
+    # price only counts when available and > 0
+    eff_price = case((((Listing.available == True) & (Listing.price > 0)), Listing.price))
+    q = (
+        select(
+            Product.id, Product.query, Product.title, Product.cover_image,
+            func.count(Listing.id).label("listing_count"),
+            func.min(eff_price).label("min_price"),
+            func.max(Listing.image).label("any_image"),
+        )
+        .outerjoin(Listing, Listing.product_id == Product.id)
+        .where(Product.user_id == user_id)
+        .group_by(Product.id)
+        .order_by(Product.created_at.desc())
+    )
+    with SessionLocal() as s:
+        out = []
+        for r in s.execute(q):
+            out.append({
+                "id": r.id,
+                "query": r.query,
+                "title": r.title or r.query,
+                "cover_image": r.cover_image or r.any_image,
+                "min_price": r.min_price,
+                "listing_count": r.listing_count,
+            })
+        return out
 
 
 def get_product(user_id, product_id):
