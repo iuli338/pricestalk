@@ -73,3 +73,5 @@ event delegation (no inline handlers); all API calls go through `js/api.js`.
 Region: Romania · Currency: RON · Language: English + Romanian (switchable in the header). Scraping is best-effort; selectors may need updates over time.
 
 Non-commercial personal project. See [DISCLAIMER.md](DISCLAIMER.md) — site owners can request exclusion at naive.julian@gmail.com.
+
+If the project ever matures enough, it will move from scraping to official retailer affiliate feeds/APIs.
