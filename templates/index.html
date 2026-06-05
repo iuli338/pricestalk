@@ -29,11 +29,13 @@
   </header>
 
   <main>
-    <div class="search">
-      <input id="q" class="input" type="text"
-             placeholder='Add a product, e.g. "rtx 5050 laptop"'
-             onkeydown="if(event.key==='Enter')addProduct()">
-      <button class="btn btn-primary" onclick="addProduct()">Add</button>
+    <div class="search-wrap">
+      <div class="search">
+        <input id="q" class="input" type="text"
+               placeholder='Add a product, e.g. "rtx 5050 laptop"'
+               onkeydown="if(event.key==='Enter')addProduct()">
+        <button class="btn btn-primary" onclick="addProduct()">Add</button>
+      </div>
     </div>
     <div id="grid" class="grid"></div>
     <div id="empty" class="empty" style="display:none">No products yet. Add one above to start tracking.</div>

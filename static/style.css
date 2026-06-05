@@ -109,10 +109,15 @@ body {
 /* --- Main / search --- */
 main { max-width: var(--maxw); margin: 0 auto; padding: var(--s-6) var(--s-5); }
 
+.search-wrap {
+  display: flex;
+  justify-content: center;
+  margin-bottom: var(--s-6);
+}
 .search {
   display: flex;
   gap: var(--s-2);
-  margin-bottom: var(--s-6);
+  width: 100%;
   max-width: 640px;
 }
 .input {
