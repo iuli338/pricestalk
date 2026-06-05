@@ -172,3 +172,16 @@ def update_listing(product_id, url, fields):
                 _save(data)
                 return l
         return None
+
+
+def remove_listing(product_id, url):
+    """Remove a single link from a saved product."""
+    with _lock:
+        data = _load()
+        product = _find(data["products"], product_id)
+        if not product:
+            return False
+        before = len(product["listings"])
+        product["listings"] = [l for l in product["listings"] if l.get("url") != url]
+        _save(data)
+        return len(product["listings"]) < before

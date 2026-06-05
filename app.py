@@ -138,6 +138,15 @@ def api_refresh(pid):
     return jsonify(_decorate(storage.get_product(pid)))
 
 
+@app.route("/api/products/<pid>/listings", methods=["DELETE"])
+def api_remove_listing(pid):
+    url = (request.json or {}).get("url", "")
+    removed = storage.remove_listing(pid, url)
+    if not removed:
+        return jsonify({"error": "not found"}), 404
+    return jsonify(_decorate(storage.get_product(pid)))
+
+
 @app.route("/api/products/<pid>/refresh-one", methods=["POST"])
 def api_refresh_one(pid):
     """Re-fetch a single pinned link (for link-by-link UI refresh)."""

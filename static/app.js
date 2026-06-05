@@ -208,7 +208,13 @@ async function openDetail(id){
   const groups = Object.entries(bySite).map(([site,ls]) => `
     <h3>${site} <span class="muted">· ${ls.length}</span></h3>
     ${ls.map(l => `
-      <div class="listing">
+      <div class="listing${l.url===cheapestUrl?' cheapest':''}">
+        <div class="ln-menu">
+          <button class="kebab" title="Actions" onclick="toggleMenu(event)">${KEBAB}</button>
+          <div class="menu">
+            <button class="menu-item danger" onclick='removeLink("${id}", ${JSON.stringify(l.url)})'>Remove</button>
+          </div>
+        </div>
         ${thumb(l)}
         <a class="ln-title" href="${l.url||'#'}" target="_blank">${esc(l.title||l.url)}</a>
         <span class="lp-slot" id="${slotId(l.url)}">
@@ -244,6 +250,28 @@ async function openDetail(id){
 const PENCIL = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
 // price tag icon, shown next to the lowest price
 const TAG = '<svg class="tag-ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0l-7.2-7.2A2 2 0 0 1 2.8 12V4a2 2 0 0 1 2-2h8a2 2 0 0 1 1.4.6l6.4 6.4a2 2 0 0 1 0 2.4Z"/><circle cx="7.5" cy="7.5" r="1.2" fill="currentColor"/></svg>';
+// vertical 3-dot (kebab) menu icon
+const KEBAB = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>';
+
+// open one kebab menu at a time; close others
+function toggleMenu(e){
+  e.stopPropagation();
+  const menu = e.currentTarget.parentElement;
+  const open = menu.classList.contains('open');
+  document.querySelectorAll('.ln-menu.open').forEach(m => m.classList.remove('open'));
+  if(!open) menu.classList.add('open');
+}
+// close menus on outside click
+document.addEventListener('click', () => {
+  document.querySelectorAll('.ln-menu.open').forEach(m => m.classList.remove('open'));
+});
+
+async function removeLink(id, url){
+  if(!confirm('Remove this link?')) return;
+  await fetch('/api/products/'+id+'/listings', {method:'DELETE', headers:{'Content-Type':'application/json'}, body: JSON.stringify({url})});
+  openDetail(id);
+  load();
+}
 
 // URL of the cheapest available, priced listing
 function cheapestLinkUrl(listings){
@@ -331,11 +359,13 @@ async function refreshDetail(id){
   for(const f of fresh){
     const slot = document.getElementById(slotId(f.url));
     if(!slot) continue;
+    const isCheapest = f.url===cheapestUrl;
     const priceTxt = f.price!=null ? fmt(f.price) : (f.error ? 'error' : '—');
-    const tag = f.url===cheapestUrl ? `<span class="cheapest-ico" title="Lowest price">${TAG}</span>` : '';
+    const tag = isCheapest ? `<span class="cheapest-ico" title="Lowest price">${TAG}</span>` : '';
     slot.innerHTML = tag +
       `<span class="lp ${f.dropped?'drop':''}">${priceTxt}${f.dropped?' ↓':''}</span>` +
       (f.available===false?'<span class="oos"> · out of stock</span>':'');
+    slot.closest('.listing').classList.toggle('cheapest', isCheapest);
   }
   const minEl = $('#dtMin');
   if(minEl){
