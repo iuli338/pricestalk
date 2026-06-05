@@ -145,6 +145,21 @@ def delete_product(product_id):
         return len(data["products"]) < before
 
 
+def update_product(product_id, fields):
+    """Update editable product fields (title, cover_image)."""
+    allowed = {"title", "cover_image"}
+    with _lock:
+        data = _load()
+        product = _find(data["products"], product_id)
+        if not product:
+            return None
+        for k, v in fields.items():
+            if k in allowed:
+                product[k] = v
+        _save(data)
+        return product
+
+
 def update_listing(product_id, url, fields):
     with _lock:
         data = _load()

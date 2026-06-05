@@ -33,6 +33,10 @@ def _decorate(product):
     p = dict(product)
     p["min_price"] = _min_price(product)
     p["listing_count"] = len(product["listings"])
+    # title defaults to the initial search query; cover defaults to first image
+    p["title"] = product.get("title") or product.get("query")
+    p["cover_image"] = product.get("cover_image") or next(
+        (l["image"] for l in product["listings"] if l.get("image")), None)
     return p
 
 
@@ -111,6 +115,20 @@ def api_delete(pid):
     return jsonify({"deleted": storage.delete_product(pid)})
 
 
+@app.route("/api/products/<pid>", methods=["PATCH"])
+def api_update(pid):
+    body = request.json or {}
+    fields = {}
+    if "title" in body:
+        fields["title"] = (body["title"] or "").strip() or storage.get_product(pid)["query"]
+    if "cover_image" in body:
+        fields["cover_image"] = body["cover_image"]
+    p = storage.update_product(pid, fields)
+    if not p:
+        return jsonify({"error": "not found"}), 404
+    return jsonify(_decorate(p))
+
+
 @app.route("/api/products/<pid>/refresh", methods=["POST"])
 def api_refresh(pid):
     p = storage.get_product(pid)
@@ -118,6 +136,34 @@ def api_refresh(pid):
         return jsonify({"error": "not found"}), 404
     scheduler.refresh_product(p)
     return jsonify(_decorate(storage.get_product(pid)))
+
+
+@app.route("/api/products/<pid>/refresh-one", methods=["POST"])
+def api_refresh_one(pid):
+    """Re-fetch a single pinned link (for link-by-link UI refresh)."""
+    url = (request.json or {}).get("url", "")
+    p = storage.get_product(pid)
+    if not p:
+        return jsonify({"error": "not found"}), 404
+    listing = next((l for l in p["listings"] if l.get("url") == url), None)
+    if not listing:
+        return jsonify({"error": "link not found"}), 404
+    old = listing.get("price")
+    res = scraper.fetch_price(url)
+    fields = {"last_checked": scheduler._now()}
+    if res.get("price") is not None:
+        fields["price"] = res["price"]
+    fields["available"] = res.get("available", listing.get("available", True))
+    updated = storage.update_listing(pid, url, fields)
+    return jsonify({
+        "url": url,
+        "price": updated.get("price"),
+        "available": updated.get("available", True),
+        "old": old,
+        "dropped": bool(old and updated.get("price") and updated["price"] < old),
+        "error": res.get("error"),
+        "min_price": _min_price(storage.get_product(pid)),
+    })
 
 
 @app.route("/api/notifications")

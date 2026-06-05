@@ -34,8 +34,12 @@ function entityCard(p){
   const price = p.min_price != null
     ? `<div class="price">${fmt(p.min_price)}</div>`
     : `<div class="price none">No price yet</div>`;
+  const img = p.cover_image
+    ? `<div class="card-img" style="background-image:url('${esc(p.cover_image)}')"></div>`
+    : `<div class="card-img lc-noimg">no image</div>`;
   el.innerHTML = `
-    <h3>${esc(p.query)}</h3>
+    ${img}
+    <h3>${esc(p.title || p.query)}</h3>
     ${price}
     <div class="meta">lowest of ${p.listing_count} link(s)</div>`;
   return el;
@@ -104,6 +108,7 @@ function renderWizard(){
 
 function listingCard(it, pinnable){
   const pinned = it.url && WZ.pinned.has(it.url);
+  const oos = it.available === false;
   const img = it.image
     ? `<div class="lc-img" style="background-image:url('${esc(it.image)}')"></div>`
     : `<div class="lc-img lc-noimg">no image</div>`;
@@ -112,10 +117,10 @@ function listingCard(it, pinnable){
          onclick='wizPin(${JSON.stringify(it).replace(/'/g,"&#39;")}, this)'>${pinned?'Pinned ✓':'Pin'}</button>`
     : `<span class="lc-ref">market price</span>`;
   return `
-    <div class="lc">
+    <div class="lc${oos?' lc-oos':''}">
       ${img}
       <div class="lc-title" title="${esc(it.title)}">${esc(it.title)}</div>
-      <div class="lc-price">${fmt(it.price)||'—'}</div>
+      <div class="lc-price">${fmt(it.price)||'—'}${oos?'<span class="oos"> · out of stock</span>':''}</div>
       ${pinBtn}
     </div>`;
 }
@@ -177,37 +182,132 @@ async function cancelWizard(){
 // ===================================================================
 // Detail modal
 // ===================================================================
+// id-safe key for a link's price slot
+const slotId = url => 'pr_' + btoa(unescape(encodeURIComponent(url||''))).replace(/[^a-z0-9]/gi,'');
+
+let DETAIL = null;  // current product in the detail modal
+
 async function openDetail(id){
   const p = await api('/api/products/'+id);
+  DETAIL = p;
   const bySite = {};
   for(const l of p.listings){ (bySite[l.site]=bySite[l.site]||[]).push(l); }
+  const thumb = l => l.image
+    ? `<div class="ln-img" style="background-image:url('${esc(l.image)}')"></div>`
+    : `<div class="ln-img ln-noimg"></div>`;
   const groups = Object.entries(bySite).map(([site,ls]) => `
     <h3>${site} <span class="muted">· ${ls.length}</span></h3>
     ${ls.map(l => `
       <div class="listing">
-        <a href="${l.url||'#'}" target="_blank">${esc(l.title||l.url)}</a>
-        <span>
+        ${thumb(l)}
+        <a class="ln-title" href="${l.url||'#'}" target="_blank">${esc(l.title||l.url)}</a>
+        <span class="lp-slot" id="${slotId(l.url)}">
           <span class="lp">${fmt(l.price)||'—'}</span>
           ${l.available===false?'<span class="oos"> · out of stock</span>':''}
         </span>
       </div>`).join('')}`).join('') || '<p class="muted">No links.</p>';
 
+  const coverHtml = p.cover_image
+    ? `<div class="dt-img" style="background-image:url('${esc(p.cover_image)}')"></div>`
+    : `<div class="dt-img lc-noimg">no image</div>`;
+
   openModal(`
     <button class="btn btn-sm close" onclick="closeModal()">Close</button>
-    <h2>${esc(p.query)}</h2>
-    <div class="price ${p.min_price==null?'none':''}">${p.min_price!=null?fmt(p.min_price):'No price yet'}</div>
-    <p class="muted">Lowest across ${p.listing_count} link(s)</p>
-    <div class="row" style="margin:12px 0">
-      <button class="btn btn-sm" id="refreshBtn" onclick="refreshDetail('${id}')">Refresh prices</button>
-      <button class="btn btn-sm" onclick="delProduct('${id}')">Delete</button>
+    <div class="dt-head">
+      <div class="dt-img-wrap" onclick="openImagePicker('${id}')" title="Change image">
+        ${coverHtml}
+        <span class="dt-img-edit">${PENCIL}</span>
+      </div>
+      <div class="dt-info">
+        <div id="dtTitle">${titleView(p)}</div>
+        <div class="price ${p.min_price==null?'none':''}" id="dtMin">${p.min_price!=null?fmt(p.min_price):'No price yet'}</div>
+        <p class="muted">Lowest across ${p.listing_count} link(s)</p>
+        <p class="dt-search">initial search text: <span class="muted">${esc(p.query)}</span></p>
+        <div class="row" style="margin-top:8px">
+          <button class="btn btn-sm" id="refreshBtn" onclick="refreshDetail('${id}')">Refresh prices</button>
+          <button class="btn btn-sm" onclick="delProduct('${id}')">Delete</button>
+        </div>
+      </div>
     </div>
     ${groups}`);
 }
 
-async function refreshDetail(id){
-  const b = $('#refreshBtn'); if(b){ b.disabled=true; b.textContent='Refreshing…'; }
-  await post('/api/products/'+id+'/refresh');
+const PENCIL = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+
+function titleView(p){
+  return `<h2 class="dt-title-text">${esc(p.title)}
+    <button class="btn-edit" title="Edit title" onclick="editTitle('${p.id}')">${PENCIL}</button></h2>`;
+}
+
+function editTitle(id){
+  const cur = DETAIL.title || '';
+  $('#dtTitle').innerHTML = `
+    <div class="title-edit">
+      <input id="titleInput" class="title-input" type="text" value="${esc(cur)}"
+             onkeydown="if(event.key==='Enter')saveTitle('${id}');if(event.key==='Escape')cancelTitle()">
+      <div class="row" style="margin-top:6px">
+        <button class="btn btn-sm btn-primary" onclick="saveTitle('${id}')">Save</button>
+        <button class="btn btn-sm" onclick="cancelTitle()">Cancel</button>
+      </div>
+    </div>`;
+  const inp = $('#titleInput'); inp.focus(); inp.select();
+}
+
+async function saveTitle(id){
+  const val = $('#titleInput').value.trim();
+  const p = await api('/api/products/'+id, {method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({title: val})});
+  DETAIL.title = p.title;
+  $('#dtTitle').innerHTML = titleView(p);
+  load();
+}
+function cancelTitle(){ $('#dtTitle').innerHTML = titleView(DETAIL); }
+
+// --- Image picker: choose cover from pinned links' images ---
+function openImagePicker(id){
+  const imgs = [...new Set(DETAIL.listings.map(l => l.image).filter(Boolean))];
+  const tiles = imgs.length ? imgs.map(src => `
+    <div class="pick-tile ${src===DETAIL.cover_image?'sel':''}"
+         style="background-image:url('${esc(src)}')"
+         onclick="pickImage('${id}', '${esc(src)}')"></div>`).join('')
+    : '<p class="muted">No images available from the pinned links.</p>';
+  openModal(`
+    <button class="btn btn-sm close" onclick="openDetail('${id}')">Back</button>
+    <h2>Choose image</h2>
+    <p class="muted">Pick a cover image from the pinned links.</p>
+    <div class="pick-grid">${tiles}</div>`);
+}
+
+async function pickImage(id, src){
+  await api('/api/products/'+id, {method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({cover_image: src})});
   openDetail(id);
+  load();
+}
+
+// Refresh link-by-link: spinner on each price slot, then show the new price.
+async function refreshDetail(id){
+  const b = $('#refreshBtn');
+  if(b){ b.disabled = true; b.textContent = 'Refreshing…'; }
+  const p = await api('/api/products/'+id);
+  let lastMin = null;
+  for(const l of p.listings){
+    if(!l.url) continue;
+    const slot = document.getElementById(slotId(l.url));
+    if(slot) slot.innerHTML = '<span class="mini-spinner"></span>';
+    const res = await post('/api/products/'+id+'/refresh-one', {url: l.url});
+    lastMin = res.min_price;
+    if(slot){
+      const priceTxt = res.price!=null ? fmt(res.price) : (res.error ? 'error' : '—');
+      slot.innerHTML =
+        `<span class="lp ${res.dropped?'drop':''}">${priceTxt}${res.dropped?' ↓':''}</span>` +
+        (res.available===false?'<span class="oos"> · out of stock</span>':'');
+    }
+  }
+  const minEl = $('#dtMin');
+  if(minEl){
+    minEl.textContent = lastMin!=null ? fmt(lastMin) : 'No price yet';
+    minEl.classList.toggle('none', lastMin==null);
+  }
+  if(b){ b.disabled = false; b.textContent = 'Refresh prices'; }
   load();
 }
 
