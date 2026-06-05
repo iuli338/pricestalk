@@ -30,6 +30,23 @@ SQLite stores data in `pricestalk.db` — host on a box with a **persistent disk
 (VPS, or Fly.io/Render with a volume), not an ephemeral filesystem. To move to
 Postgres later, set `DATABASE_URL=postgresql+psycopg://…`; models/queries are unchanged.
 
+### Deploy to Fly.io
+
+`Dockerfile` + `fly.toml` are included. The SQLite DB lives on a persistent
+volume mounted at `/data` (`DATABASE_URL=sqlite:////data/pricestalk.db`).
+
+```bash
+fly launch --no-deploy        # or use the GitHub deploy UI; reuses fly.toml
+fly volumes create pricestalk_data --size 1 --region cdg
+fly secrets set SECRET_KEY=$(python -c "import secrets;print(secrets.token_hex(32))")
+fly deploy
+```
+
+Notes:
+- 1 gunicorn worker (the 24h scheduler must run once, not per-worker).
+- `RUN_SCHEDULER=1` starts the scheduler under gunicorn (set in `fly.toml`).
+- Fly has no Romanian region, so Altex scout won't work there (eMAG + Compari do).
+
 ## Files
 
 ```

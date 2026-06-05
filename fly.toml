@@ -1,0 +1,29 @@
+# Fly.io config for PriceStalk.
+app = "pricestalk"
+primary_region = "cdg"   # Paris (closest EU region; Fly has no RO region)
+
+[build]
+
+[env]
+  PORT = "8080"
+  DEBUG = "0"
+  RUN_SCHEDULER = "1"
+  REFRESH_HOURS = "24"
+  # SQLite lives on the persistent volume mounted at /data
+  DATABASE_URL = "sqlite:////data/pricestalk.db"
+
+# Persistent disk for the SQLite database (survives restarts/deploys).
+[mounts]
+  source = "pricestalk_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

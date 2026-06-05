@@ -1,4 +1,6 @@
 """PriceStalk - Flask backend (app factory)."""
+import os
+
 from flask import Flask, jsonify, render_template, request
 from flask_login import login_required, current_user
 
@@ -18,6 +20,10 @@ def create_app(config=Config):
     init_login(app)
     app.register_blueprint(auth_bp)
     register_routes(app)
+    # Under gunicorn (production) start the scheduler here; set RUN_SCHEDULER=1.
+    # In local dev it is started in __main__ instead (avoids double-start).
+    if os.environ.get("RUN_SCHEDULER") == "1":
+        scheduler.start(app.config["REFRESH_HOURS"])
     return app
 
 
