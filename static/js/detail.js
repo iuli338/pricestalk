@@ -5,8 +5,9 @@ import { fmt } from './format.js';
 import { t } from './i18n.js';
 import { PENCIL, TAG, KEBAB } from './icons.js';
 import { openModal, closeModal } from './modal.js';
-import { detail, cheapestLinkUrl } from './store.js';
+import { detail, cheapestLinkUrl, refreshing } from './store.js';
 import { startAppendWizard } from './wizard.js';
+import { toast } from './toast.js';
 
 // reload the home grid after changes (set by main.js to avoid a circular import)
 let reloadHome = () => {};
@@ -27,9 +28,18 @@ const ACTIONS = {
   remove:      (el, ds) => removeLink(ds.url),
 };
 
+// a product is "busy" if the backend says so OR we started a refresh this session
+function isBusy(p) {
+  return !!p && (p.refreshing || refreshing.has(p.id));
+}
+
 export async function openDetail(id) {
   const p = await api.getProduct(id);
   detail.product = p;
+  const busy = isBusy(p);
+
+  // if it's refreshing but we have no local watcher, attach one (other tab / reopen)
+  if (busy && !refreshing.has(id)) watchRefresh(id);
 
   const bySite = {};
   for (const l of p.listings) (bySite[l.site] = bySite[l.site] || []).push(l);
@@ -37,30 +47,31 @@ export async function openDetail(id) {
 
   const groups = Object.entries(bySite).map(([site, ls]) => `
     <h3>${site} <span class="muted">· ${ls.length}</span></h3>
-    ${ls.map(l => listingRow(l, l.url === cheapestUrl)).join('')}`).join('')
+    ${ls.map(l => listingRow(l, l.url === cheapestUrl, busy)).join('')}`).join('')
     || `<p class="muted">${t('detail.no_links')}</p>`;
 
   const coverHtml = p.cover_image
     ? `<div class="dt-img" style="background-image:url('${esc(p.cover_image)}')"></div>`
     : `<div class="dt-img lc-noimg">${t('wizard.no_image')}</div>`;
 
+  const dis = busy ? 'disabled' : '';
   openModal(`
     <div class="dt-fixed">
       <button class="btn btn-sm close" data-action="close">${t('detail.close')}</button>
       <div class="dt-head">
-        <div class="dt-img-wrap" data-action="pickImage" title="${t('detail.change_image')}">
+        <div class="dt-img-wrap ${busy ? 'is-busy' : ''}" ${busy ? '' : 'data-action="pickImage"'} title="${t('detail.change_image')}">
           ${coverHtml}
-          <span class="dt-img-edit">${PENCIL}</span>
+          ${busy ? '' : `<span class="dt-img-edit">${PENCIL}</span>`}
         </div>
         <div class="dt-info">
-          <div id="dtTitle">${titleView(p)}</div>
-          <div class="price ${p.min_price == null ? 'none' : ''}" id="dtMin">${p.min_price != null ? fmt(p.min_price) : t('detail.no_price')}</div>
+          <div id="dtTitle">${titleView(p, busy)}</div>
+          <div class="price ${p.min_price == null ? 'none' : ''}" id="dtMin">${busy ? `<span class="mini-spinner"></span>` : (p.min_price != null ? fmt(p.min_price) : t('detail.no_price'))}</div>
           <p class="muted">${t('detail.lowest_across', { n: p.listing_count })}</p>
           <p class="muted">${t('detail.initial_search', { q: esc(p.query) })}</p>
           <div class="row" style="margin-top:8px">
-            <button class="btn btn-sm btn-primary" data-action="addLinks">${t('detail.add_links')}</button>
-            <button class="btn btn-sm" id="refreshBtn" data-action="refresh">${t('detail.refresh')}</button>
-            <button class="btn btn-sm" data-action="del">${t('detail.delete')}</button>
+            <button class="btn btn-sm btn-primary" data-action="addLinks" ${dis}>${t('detail.add_links')}</button>
+            <button class="btn btn-sm" id="refreshBtn" data-action="refresh" ${dis}>${busy ? t('detail.refreshing') : t('detail.refresh')}</button>
+            <button class="btn btn-sm" data-action="del" ${dis}>${t('detail.delete')}</button>
           </div>
         </div>
       </div>
@@ -68,21 +79,24 @@ export async function openDetail(id) {
     <div class="dt-links">${groups}</div>`, { dismissable: true, actions: ACTIONS });
 }
 
-function listingRow(l, isCheapest) {
+function listingRow(l, isCheapest, busy) {
   const thumb = l.image
     ? `<div class="ln-img" style="background-image:url('${esc(l.image)}')"></div>`
     : `<div class="ln-img ln-noimg"></div>`;
-  return `
-    <div class="listing${isCheapest ? ' cheapest' : ''}">
+  const menu = busy ? '' : `
       <div class="ln-menu">
         <button class="kebab" title="${t('detail.actions')}" data-action="toggleMenu">${KEBAB}</button>
         <div class="menu">
           <button class="menu-item danger" data-action="remove" data-url="${esc(l.url)}">${t('detail.remove')}</button>
         </div>
-      </div>
+      </div>`;
+  const priceCell = busy ? '<span class="mini-spinner"></span>' : linkPriceHtml(l, isCheapest);
+  return `
+    <div class="listing${isCheapest && !busy ? ' cheapest' : ''}">
+      ${menu}
       ${thumb}
       <a class="ln-title" href="${l.url || '#'}" target="_blank">${esc(l.title || l.url)}</a>
-      <span class="lp-slot" id="${slotId(l.url)}">${linkPriceHtml(l, isCheapest)}</span>
+      <span class="lp-slot" id="${slotId(l.url)}">${priceCell}</span>
     </div>`;
 }
 
@@ -110,9 +124,9 @@ async function removeLink(url) {
 }
 
 // --- title edit ---
-function titleView(p) {
-  return `<h2 class="dt-title-text">${esc(p.title)}
-    <button class="btn-edit" title="${t('title.edit')}" data-action="editTitle">${PENCIL}</button></h2>`;
+function titleView(p, busy) {
+  const edit = busy ? '' : `<button class="btn-edit" title="${t('title.edit')}" data-action="editTitle">${PENCIL}</button>`;
+  return `<h2 class="dt-title-text">${esc(p.title)} ${edit}</h2>`;
 }
 
 function editTitle() {
@@ -167,40 +181,45 @@ function addLinks() {
   startAppendWizard(p.query, p.id, existing);
 }
 
-// --- refresh link-by-link ---
+// --- refresh: one backend call, all prices loading, toast at the end ---
 async function refreshDetail() {
   const id = detail.product.id;
-  const b = $('#refreshBtn');
-  if (b) { b.disabled = true; b.textContent = t('detail.refreshing'); }
-  const p = await api.getProduct(id);
-  let lastMin = null;
-  const fresh = [];
-  for (const l of p.listings) {
-    if (!l.url) continue;
-    const slot = document.getElementById(slotId(l.url));
-    if (slot) slot.innerHTML = '<span class="mini-spinner"></span>';
-    const res = await api.refreshOne(id, l.url);
-    lastMin = res.min_price;
-    fresh.push({ url: l.url, price: res.price, available: res.available, dropped: res.dropped, error: res.error });
+  if (refreshing.has(id)) return;          // already in flight
+  refreshing.add(id);
+  if (detail.product && detail.product.id === id) openDetail(id);  // re-render as busy
+  reloadHome();                            // card shows loading too
+
+  let res;
+  try {
+    res = await api.refresh(id);
+  } finally {
+    refreshing.delete(id);
   }
-  const cheapestUrl = cheapestLinkUrl(fresh);
-  for (const f of fresh) {
-    const slot = document.getElementById(slotId(f.url));
-    if (!slot) continue;
-    const isCheapest = f.url === cheapestUrl;
-    const priceTxt = f.price != null ? fmt(f.price) : (f.error ? t('detail.error') : '—');
-    const tag = isCheapest ? `<span class="cheapest-ico" title="${t('detail.lowest_price')}">${TAG}</span>` : '';
-    slot.innerHTML = tag +
-      `<span class="lp ${f.dropped ? 'drop' : ''}">${priceTxt}${f.dropped ? ' ↓' : ''}</span>` +
-      (f.available === false ? `<span class="oos"> · ${t('wizard.oos')}</span>` : '');
-    slot.closest('.listing').classList.toggle('cheapest', isCheapest);
+
+  if (res && res.status === 409) {         // someone else was already refreshing
+    toast(t('detail.refresh_busy'));
+  } else if (res && res.ok) {
+    toast(t('detail.refresh_done'));
+  } else {
+    toast(t('detail.refresh_error'));
   }
-  const minEl = $('#dtMin');
-  if (minEl) {
-    minEl.textContent = lastMin != null ? fmt(lastMin) : t('detail.no_price');
-    minEl.classList.toggle('none', lastMin == null);
+  if (detail.product && detail.product.id === id) openDetail(id);  // show fresh prices
+  reloadHome();
+}
+
+// attach to a refresh already running (modal reopened / another tab); poll to finish
+async function watchRefresh(id) {
+  refreshing.add(id);
+  try {
+    while (true) {
+      await new Promise(r => setTimeout(r, 1500));
+      const p = await api.getProduct(id);
+      if (!p || !p.refreshing) break;
+    }
+  } finally {
+    refreshing.delete(id);
   }
-  if (b) { b.disabled = false; b.textContent = t('detail.refresh'); }
+  if (detail.product && detail.product.id === id) openDetail(id);
   reloadHome();
 }
 

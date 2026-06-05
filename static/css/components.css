@@ -31,6 +31,14 @@
 .card:hover::before { opacity: 1; }
 
 .card.entity { cursor: pointer; }
+.card.entity.is-busy { cursor: progress; }
+.card.entity.is-busy::after {
+  content: ""; position: absolute; inset: 0;
+  border-radius: var(--r-lg);
+  background: rgba(232,17,45,.04);
+  pointer-events: none;
+}
+.dt-img-wrap.is-busy { cursor: progress; }
 .card-img {
   width: 100%; aspect-ratio: 16/10;
   background: #fff center/contain no-repeat;

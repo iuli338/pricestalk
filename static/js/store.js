@@ -3,6 +3,10 @@
 // current product shown in the detail modal
 export const detail = { product: null };
 
+// product ids whose price refresh is in flight (started this session).
+// Lets the UI keep showing loading across modal/home re-renders.
+export const refreshing = new Set();
+
 // active wizard session: { draft, step, pinned:Set<url>, mode, productId }
 export let wizard = null;
 export const setWizard = w => { wizard = w; };
