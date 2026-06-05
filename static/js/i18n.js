@@ -31,6 +31,9 @@ const I18N = {
     "wizard.no_pinned": "No links pinned. Go back to pin some.",
     "wizard.finalize": "Finalize",
     "wizard.saved": "Product saved.",
+    "wizard.add_links": "Add links",
+    "wizard.links_added": "Links added.",
+    "wizard.already_added": "Already added",
 
     "detail.close": "Close",
     "detail.change_image": "Change image",
@@ -39,6 +42,7 @@ const I18N = {
     "detail.initial_search": "initial search text: {q}",
     "detail.refresh": "Refresh prices",
     "detail.refreshing": "Refreshing…",
+    "detail.add_links": "Add links",
     "detail.delete": "Delete",
     "detail.no_links": "No links.",
     "detail.lowest_price": "Lowest price",
@@ -92,6 +96,9 @@ const I18N = {
     "wizard.no_pinned": "Niciun link pinat. Întoarce-te ca să pinezi.",
     "wizard.finalize": "Finalizează",
     "wizard.saved": "Produs salvat.",
+    "wizard.add_links": "Adaugă linkuri",
+    "wizard.links_added": "Linkuri adăugate.",
+    "wizard.already_added": "Deja adăugat",
 
     "detail.close": "Închide",
     "detail.change_image": "Schimbă imaginea",
@@ -100,6 +107,7 @@ const I18N = {
     "detail.initial_search": "text căutare inițial: {q}",
     "detail.refresh": "Reîmprospătează prețurile",
     "detail.refreshing": "Reîmprospătez…",
+    "detail.add_links": "Adaugă linkuri",
     "detail.delete": "Șterge",
     "detail.no_links": "Niciun link.",
     "detail.lowest_price": "Cel mai mic preț",
@@ -123,30 +131,34 @@ const I18N = {
   },
 };
 
-let LANG = localStorage.getItem('lang') || (navigator.language || 'en').slice(0,2);
-if(!I18N[LANG]) LANG = 'en';
+export let LANG = localStorage.getItem('lang') || (navigator.language || 'en').slice(0, 2);
+if (!I18N[LANG]) LANG = 'en';
+
+// listeners notified after a language change (e.g. re-render home)
+const onChange = [];
+export const onLangChange = fn => onChange.push(fn);
 
 // translate a key with optional {placeholders}
-function t(key, vars){
+export function t(key, vars) {
   let s = (I18N[LANG] && I18N[LANG][key]) || (I18N.en[key]) || key;
-  if(vars) for(const k in vars) s = s.replaceAll('{'+k+'}', vars[k]);
+  if (vars) for (const k in vars) s = s.replaceAll('{' + k + '}', vars[k]);
   return s;
 }
 
-function setLang(lang){
-  if(!I18N[lang]) return;
+export function setLang(lang) {
+  if (!I18N[lang]) return;
   LANG = lang;
   localStorage.setItem('lang', lang);
   document.documentElement.lang = lang;
   applyStaticI18n();
-  if(typeof load === 'function') load();   // re-render home
+  onChange.forEach(fn => fn());
 }
 
-// translate static [data-i18n] / [data-i18n-ph] elements in the DOM
-function applyStaticI18n(){
+// translate static [data-i18n] / [data-i18n-ph] / [data-i18n-title] elements
+export function applyStaticI18n() {
   document.querySelectorAll('[data-i18n]').forEach(el => { el.textContent = t(el.dataset.i18n); });
   document.querySelectorAll('[data-i18n-ph]').forEach(el => { el.placeholder = t(el.dataset.i18nPh); });
   document.querySelectorAll('[data-i18n-title]').forEach(el => { el.title = t(el.dataset.i18nTitle); });
   const sel = document.getElementById('langSelect');
-  if(sel) sel.value = LANG;
+  if (sel) sel.value = LANG;
 }

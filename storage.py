@@ -124,6 +124,24 @@ def finalize_draft(draft_id):
         return product
 
 
+def append_draft_to_product(product_id, draft_id):
+    """Append a draft's pinned listings to an existing product, then drop the draft."""
+    with _lock:
+        data = _load()
+        product = _find(data["products"], product_id)
+        draft = _find(data["drafts"], draft_id)
+        if not product or not draft:
+            return None
+        existing = {l.get("url") for l in product["listings"]}
+        for l in draft["pinned"]:
+            if l.get("url") not in existing:
+                product["listings"].append(l)
+                existing.add(l.get("url"))
+        data["drafts"] = [d for d in data["drafts"] if d["id"] != draft_id]
+        _save(data)
+        return product
+
+
 # ---------------------------------------------------------------- products
 
 def list_products():

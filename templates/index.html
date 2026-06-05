@@ -14,7 +14,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap">
   <link rel="stylesheet" href="{{ url_for('static', filename='tokens.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/wizard.css') }}">
 </head>
 <body>
   <header class="site-header">
@@ -24,12 +26,11 @@
         <span class="tag" data-i18n="app.tag">Romania · RON</span>
       </div>
       <div class="header-actions">
-        <select id="langSelect" class="lang-select" data-i18n-title="header.lang"
-                title="Language" onchange="setLang(this.value)">
+        <select id="langSelect" class="lang-select" data-i18n-title="header.lang" title="Language">
           <option value="en">EN</option>
           <option value="ro">RO</option>
         </select>
-        <button class="btn btn-icon" id="themeBtn" title="Toggle theme" onclick="toggleTheme()">◑</button>
+        <button class="btn btn-icon" id="themeBtn" title="Toggle theme">◑</button>
       </div>
     </div>
   </header>
@@ -39,9 +40,8 @@
       <div class="search">
         <input id="q" class="input" type="text"
                data-i18n-ph="search.placeholder"
-               placeholder='Add a product, e.g. "rtx 5050 laptop"'
-               onkeydown="if(event.key==='Enter')addProduct()">
-        <button class="btn btn-primary" data-i18n="search.add" onclick="addProduct()">Add</button>
+               placeholder='Add a product, e.g. "rtx 5050 laptop"'>
+        <button id="addBtn" class="btn btn-primary" data-i18n="search.add">Add</button>
       </div>
     </div>
     <div id="grid" class="grid"></div>
@@ -53,7 +53,6 @@
   </div>
   <div id="toast" class="toast"></div>
 
-  <script src="{{ url_for('static', filename='i18n.js') }}"></script>
-  <script src="{{ url_for('static', filename='app.js') }}"></script>
+  <script type="module" src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>

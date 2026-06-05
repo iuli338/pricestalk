@@ -19,16 +19,37 @@ http://localhost:5000
 
 ```
 app.py                 Flask routes / REST API
-scraper.py             search (eMAG) + generic price fetch
-storage.py             JSON persistence (products, listings, suggestions)
-scheduler.py           24h re-scout: refresh prices + find new listings
-templates/index.html   page markup
-static/style.css       styling
-static/app.js          UI logic (fetch API, render, modals)
-static/i18n.js         translations (EN/RO) + t() helper
+scraper.py             search (eMAG/Altex/Compari) + price fetch
+storage.py             JSON persistence (drafts + product entities)
+scheduler.py           24h price-drop re-fetch
+templates/index.html   page markup (module entry: static/js/main.js)
+tokens.css             design tokens (light/dark themes)
+
+static/css/
+  base.css             reset, header, buttons, search
+  components.css       grid/cards, modal, toast, listings, menu, detail head
+  wizard.css           wizard steps + listing cards
+
+static/js/             ES modules (native, no build step)
+  main.js              bootstrap: wires modules + top-level listeners
+  api.js               centralized fetch client (all endpoints)
+  dom.js               $, esc, slotId helpers
+  format.js            fmt(price)
+  icons.js             inline SVG icons
+  modal.js             modal + data-action event delegation
+  toast.js             transient toast
+  theme.js             light/dark toggle
+  i18n.js              EN/RO dictionaries + t()
+  store.js             shared client state + cheapest-link helper
+  home.js              product entities grid
+  wizard.js            scout wizard (create + append modes)
+  detail.js            detail modal (edit, picker, refresh, remove, add-links)
+
 data.json              storage (gitignored)
 ```
 
-UI split: `index.html` is structure only, `style.css` all styling, `app.js` all logic.
+Frontend is a buildless native-ESM SPA: `index.html` is structure only, CSS is
+split by concern, JS is ES modules wired in `main.js`. UI uses `data-action`
+event delegation (no inline handlers); all API calls go through `js/api.js`.
 
 Region: Romania · Currency: RON · Language: English + Romanian (switchable in the header). Scraping is best-effort; selectors may need updates over time.

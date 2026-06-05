@@ -138,6 +138,16 @@ def api_refresh(pid):
     return jsonify(_decorate(storage.get_product(pid)))
 
 
+@app.route("/api/products/<pid>/append", methods=["POST"])
+def api_append(pid):
+    """Append a draft's pinned listings to an existing product (Add links wizard)."""
+    draft_id = (request.json or {}).get("draft_id", "")
+    product = storage.append_draft_to_product(pid, draft_id)
+    if not product:
+        return jsonify({"error": "not found"}), 404
+    return jsonify(_decorate(product)), 200
+
+
 @app.route("/api/products/<pid>/listings", methods=["DELETE"])
 def api_remove_listing(pid):
     url = (request.json or {}).get("url", "")
