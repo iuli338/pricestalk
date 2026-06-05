@@ -1,0 +1,101 @@
+/* Global design tokens - single source of truth. Reference via var(); never hardcode. */
+
+:root {
+  /* --- Brand (theme-independent) --- */
+  --red:        #e8112d;   /* primary accent */
+  --red-dark:   #b50d23;   /* hover / pressed */
+  --red-soft:   #fdecee;   /* tinted bg (light) */
+  --charcoal:   #1c1f26;   /* near-black secondary accent */
+
+  /* --- Radius --- */
+  --r-sm: 6px;
+  --r:    10px;
+  --r-lg: 16px;
+
+  /* --- Spacing scale --- */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+  --s-7: 48px;
+
+  /* --- Typography --- */
+  --font: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --fs-sm:  13px;
+  --fs:     15px;
+  --fs-lg:  18px;
+  --fs-xl:  24px;
+  --fs-2xl: 34px;
+  --fw-reg: 400;
+  --fw-med: 600;
+  --fw-bold: 800;
+
+  /* --- Motion --- */
+  --ease: cubic-bezier(.4,0,.2,1);
+  --dur:  160ms;
+
+  /* --- Layout --- */
+  --maxw: 1080px;
+}
+
+/* --- Light theme (default) --- */
+:root,
+[data-theme="light"] {
+  --bg:        #ffffff;
+  --bg-2:      #f5f6f8;
+  --surface:   #ffffff;
+  --line:      #e7e9ee;
+  --tint:      var(--red-soft);
+
+  --txt:       #1c1f26;
+  --txt-mut:   #6b7280;
+  --txt-inv:   #ffffff;
+
+  --good:      #16a34a;
+  --warn:      #d97706;
+
+  --shadow-sm: 0 1px 2px rgba(28,31,38,.06);
+  --shadow:    0 4px 16px rgba(28,31,38,.08);
+  --shadow-lg: 0 12px 32px rgba(28,31,38,.12);
+}
+
+/* --- Dark theme --- */
+[data-theme="dark"] {
+  --bg:        #0f1115;
+  --bg-2:      #161922;
+  --surface:   #1a1d24;
+  --line:      #2a2e38;
+  --tint:      #2a1518;
+
+  --txt:       #e6e8ee;
+  --txt-mut:   #8a90a0;
+  --txt-inv:   #ffffff;
+
+  --good:      #39d98a;
+  --warn:      #ffb454;
+
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
+  --shadow:    0 4px 16px rgba(0,0,0,.45);
+  --shadow-lg: 0 12px 32px rgba(0,0,0,.55);
+}
+
+/* Follow OS preference when no explicit theme is set. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --bg:        #0f1115;
+    --bg-2:      #161922;
+    --surface:   #1a1d24;
+    --line:      #2a2e38;
+    --tint:      #2a1518;
+    --txt:       #e6e8ee;
+    --txt-mut:   #8a90a0;
+    --txt-inv:   #ffffff;
+    --good:      #39d98a;
+    --warn:      #ffb454;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,.4);
+    --shadow:    0 4px 16px rgba(0,0,0,.45);
+    --shadow-lg: 0 12px 32px rgba(0,0,0,.55);
+  }
+}

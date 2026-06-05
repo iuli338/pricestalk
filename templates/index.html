@@ -4,21 +4,39 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>PriceStalk</title>
+  <!-- apply saved theme before paint to avoid flash -->
+  <script>
+    (function(){ var t = localStorage.getItem('theme'); if(t) document.documentElement.setAttribute('data-theme', t); })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap">
+  <link rel="stylesheet" href="{{ url_for('static', filename='tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-  <header>
-    <h1>📉 PriceStalk</h1>
-    <span class="sub">Romania · RON · min-price tracker</span>
-    <button class="sm" style="margin-left:auto" onclick="checkNotifications()">🔔 Check updates</button>
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="brand">
+        <span class="name">Price<span class="accent">Stalk</span></span>
+        <span class="tag">Romania · RON</span>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-sm" onclick="checkNotifications()">Check updates</button>
+        <button class="btn btn-icon" id="themeBtn" title="Toggle theme" onclick="toggleTheme()">◑</button>
+      </div>
+    </div>
   </header>
+
   <main>
-    <div class="add-bar">
-      <input id="q" type="text" placeholder='New product, e.g. "rtx 5050 laptop"' onkeydown="if(event.key==='Enter')addProduct()">
-      <button class="primary" onclick="addProduct()">Add product</button>
+    <div class="search">
+      <input id="q" class="input" type="text"
+             placeholder='Add a product, e.g. "rtx 5050 laptop"'
+             onkeydown="if(event.key==='Enter')addProduct()">
+      <button class="btn btn-primary" onclick="addProduct()">Add</button>
     </div>
     <div id="grid" class="grid"></div>
-    <div id="empty" class="empty" style="display:none">No products yet. Add one above to start stalking prices.</div>
+    <div id="empty" class="empty" style="display:none">No products yet. Add one above to start tracking.</div>
   </main>
 
   <div id="modalBg" class="modal-bg" onclick="if(event.target===this)closeModal()">
