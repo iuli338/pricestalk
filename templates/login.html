@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PriceStalk — Sign in</title>
+  <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+  <script>
+    (function(){ var t = localStorage.getItem('theme'); if(t) document.documentElement.setAttribute('data-theme', t); })();
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap">
+  <link rel="stylesheet" href="{{ url_for('static', filename='tokens.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
+</head>
+<body class="auth-body">
+  <!-- red geometric accents (different placement than the app header) -->
+  <span class="auth-accent auth-accent-tl"></span>
+  <span class="auth-accent auth-accent-br"></span>
+  <span class="auth-accent auth-accent-br2"></span>
+
+  <main class="auth-wrap">
+    <div class="auth-card">
+      <div class="auth-brand">
+        <span class="name">Price<span class="accent">Stalk</span></span>
+      </div>
+      <p class="auth-sub" data-i18n="auth.tagline">Track the lowest price across Romanian shops.</p>
+
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="tabLogin" data-i18n="auth.login">Sign in</button>
+        <button class="auth-tab" id="tabRegister" data-i18n="auth.register">Create account</button>
+      </div>
+
+      <form id="authForm" class="auth-form" autocomplete="on">
+        <input id="email" class="input" type="email" required
+               data-i18n-ph="auth.email" placeholder="Email">
+        <input id="nickname" class="input register-only" type="text"
+               data-i18n-ph="auth.nickname" placeholder="Nickname">
+        <div class="pw-field">
+          <input id="password" class="input" type="password" required minlength="8"
+                 data-i18n-ph="auth.password" placeholder="Password">
+          <button type="button" class="pw-toggle" data-target="password" aria-label="Show password"></button>
+        </div>
+        <div class="pw-field register-only">
+          <input id="password2" class="input" type="password"
+                 data-i18n-ph="auth.password2" placeholder="Repeat password">
+          <button type="button" class="pw-toggle" data-target="password2" aria-label="Show password"></button>
+        </div>
+        <p id="authError" class="auth-error" hidden></p>
+        <button id="submitBtn" class="btn btn-primary" type="submit" data-i18n="auth.login">Sign in</button>
+      </form>
+
+      <div class="auth-footer">
+        <select id="langSelect" class="lang-select" title="Language">
+          <option value="en">EN</option>
+          <option value="ro">RO</option>
+        </select>
+        <button class="btn btn-icon" id="themeBtn" title="Toggle theme">◑</button>
+      </div>
+    </div>
+  </main>
+
+  <script type="module" src="{{ url_for('static', filename='js/login.js') }}"></script>
+</body>
+</html>

@@ -1,7 +1,12 @@
 """App configuration from environment variables (with safe dev defaults)."""
 import os
 
+from dotenv import load_dotenv
+
 BASE_DIR = os.path.dirname(__file__)
+
+# Load .env (if present) so local dev picks up SECRET_KEY etc. automatically.
+load_dotenv(os.path.join(BASE_DIR, ".env"))
 
 
 class Config:

@@ -1,6 +1,7 @@
 """SQLAlchemy models. SQLite for now; portable to Postgres via DATABASE_URL."""
 from datetime import datetime, timezone
 
+from flask_login import UserMixin
 from sqlalchemy import String, Float, Boolean, DateTime, ForeignKey, create_engine
 from sqlalchemy.orm import (
     DeclarativeBase, Mapped, mapped_column, relationship, sessionmaker,
@@ -15,15 +16,34 @@ class Base(DeclarativeBase):
     pass
 
 
+class User(Base, UserMixin):
+    __tablename__ = "users"
+
+    id:            Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    email:         Mapped[str] = mapped_column(String, unique=True, nullable=False, index=True)
+    nickname:      Mapped[str] = mapped_column(String, nullable=False)
+    password_hash: Mapped[str] = mapped_column(String, nullable=False)
+    created_at:    Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+    products: Mapped[list["Product"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan",
+    )
+
+    def get_id(self):           # Flask-Login expects a string id
+        return str(self.id)
+
+
 class Product(Base):
     __tablename__ = "products"
 
     id:         Mapped[str] = mapped_column(String(8), primary_key=True)
+    user_id:    Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     query:      Mapped[str] = mapped_column(String, nullable=False)
     title:      Mapped[str | None] = mapped_column(String, nullable=True)
     cover_image: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
+    user: Mapped["User"] = relationship(back_populates="products")
     listings: Mapped[list["Listing"]] = relationship(
         back_populates="product", cascade="all, delete-orphan", order_by="Listing.id",
     )

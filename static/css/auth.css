@@ -1,0 +1,98 @@
+/* Login / register page: centered card + red geometric accents. */
+
+.auth-body {
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  position: relative; overflow: hidden;
+  background: var(--bg);
+}
+
+/* red diagonal accents — placed in corners (different from the app header) */
+.auth-accent { position: absolute; pointer-events: none; }
+.auth-accent-tl {
+  top: -80px; left: -80px; width: 320px; height: 320px;
+  background: var(--red);
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+  opacity: .9;
+}
+.auth-accent-br {
+  bottom: -100px; right: -60px; width: 360px; height: 360px;
+  background: var(--red);
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
+  opacity: .9;
+}
+/* charcoal line parallel to the red triangle's hypotenuse, just above it.
+   The triangle's hypotenuse runs bottom-left -> top-right (a -45deg diagonal);
+   this line matches that angle and is nudged up-left to sit alongside it. */
+.auth-accent-br2 {
+  bottom: 140px; right: -80px; width: 460px; height: 14px;
+  background: var(--charcoal);
+  border-radius: 7px;
+  transform-origin: center;
+  transform: rotate(-45deg);
+  opacity: .9;
+}
+
+.auth-wrap { position: relative; z-index: 1; width: 100%; padding: var(--s-5); }
+
+.auth-card {
+  max-width: 380px; margin: 0 auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg);
+  padding: var(--s-6) var(--s-5);
+}
+
+.auth-brand { text-align: center; }
+.auth-brand .name {
+  font-size: var(--fs-2xl); font-weight: var(--fw-bold); letter-spacing: -.02em;
+}
+.auth-brand .name .accent { color: var(--red); }
+.auth-sub {
+  text-align: center; color: var(--txt-mut);
+  font-size: var(--fs-sm); margin: var(--s-2) 0 var(--s-5);
+}
+
+.auth-tabs {
+  display: flex; gap: var(--s-1);
+  background: var(--bg-2); border-radius: var(--r); padding: 4px;
+  margin-bottom: var(--s-5);
+}
+.auth-tab {
+  flex: 1; border: none; background: none; cursor: pointer;
+  font: inherit; font-weight: var(--fw-med); font-size: var(--fs-sm);
+  padding: var(--s-2); border-radius: var(--r-sm); color: var(--txt-mut);
+}
+.auth-tab.active { background: var(--surface); color: var(--txt); box-shadow: var(--shadow-sm); }
+
+.auth-form { display: flex; flex-direction: column; gap: var(--s-3); }
+.auth-form .input { width: 100%; }
+.auth-form .btn-primary { margin-top: var(--s-2); padding: var(--s-3); }
+/* loading state: white spinner on the red button */
+.btn-loading { display: flex; align-items: center; justify-content: center; }
+.btn-loading .mini-spinner { border-color: rgba(255,255,255,.45); border-top-color: #fff; }
+
+/* password input with show/hide eye toggle */
+.pw-field { position: relative; display: flex; }
+.pw-field[hidden] { display: none; }   /* override flex so [hidden] works */
+.pw-field .input { width: 100%; padding-right: 44px; }
+.pw-toggle {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  width: 32px; height: 32px; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  border: none; background: none; cursor: pointer;
+  color: var(--txt-mut); border-radius: var(--r-sm);
+}
+.pw-toggle:hover { color: var(--red); }
+
+.auth-error {
+  color: var(--red); font-size: var(--fs-sm); margin: 0;
+  text-align: center;
+}
+
+.auth-footer {
+  display: flex; justify-content: center; gap: var(--s-2);
+  margin-top: var(--s-5); padding-top: var(--s-4);
+  border-top: 1px solid var(--line);
+}

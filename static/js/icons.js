@@ -7,3 +7,7 @@ export const TAG = '<svg class="tag-ico" viewBox="0 0 24 24" width="20" height="
 
 // vertical 3-dot kebab menu
 export const KEBAB = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>';
+
+// eye (password visible) / eye-off (hidden)
+export const EYE = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>';
+export const EYE_OFF = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.9 4.2A10.5 10.5 0 0 1 12 4c6.5 0 10 7 10 7a17.6 17.6 0 0 1-3.3 4.2M6.3 6.3A17.6 17.6 0 0 0 2 11s3.5 7 10 7a10 10 0 0 0 4.2-.9"/><path d="M3 3l18 18"/></svg>';

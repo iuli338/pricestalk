@@ -1,10 +1,17 @@
 // Centralized API client. All backend calls go through here.
 
-const doFetch = (url, method, body) => fetch(url, {
-  method,
-  headers: body != null ? { 'Content-Type': 'application/json' } : undefined,
-  body: body != null ? JSON.stringify(body) : undefined,
-});
+const doFetch = (url, method, body) =>
+  fetch(url, {
+    method,
+    headers: body != null ? { 'Content-Type': 'application/json' } : undefined,
+    body: body != null ? JSON.stringify(body) : undefined,
+  }).then(r => {
+    // Auth guard: a 401 on a non-auth endpoint means the session is gone.
+    if (r.status === 401 && !url.startsWith('/api/auth/')) {
+      window.location.href = '/login';
+    }
+    return r;
+  });
 
 const req = (url, method, body) => doFetch(url, method, body).then(r => r.json());
 
@@ -26,6 +33,12 @@ export const api = {
   // wizard scout draft (results only; pinning is client-side)
   scout:          (query)      => req('/api/scout', 'POST', { query }),
   discardDraft:   (id)         => req(`/api/drafts/${id}`, 'DELETE'),
+
+  // auth
+  register:       (data)       => reqStatus('/api/auth/register', 'POST', data),
+  login:          (email, pw)  => reqStatus('/api/auth/login', 'POST', { email, password: pw }),
+  logout:         ()           => req('/api/auth/logout', 'POST'),
+  me:             ()           => reqStatus('/api/auth/me', 'GET'),
 
   // misc
   notifications:  ()           => req('/api/notifications?clear=1', 'GET'),

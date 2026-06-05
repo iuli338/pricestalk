@@ -245,6 +245,36 @@
 .pick-tile:hover { border-color: var(--red); }
 .pick-tile.sel { border-color: var(--red); box-shadow: 0 0 0 2px var(--red-soft); }
 
+/* --- User chip + profile modal --- */
+.user-chip { font-weight: var(--fw-bold); }
+.user-chip strong { font-weight: var(--fw-bold); }
+
+.modal:has(.pf-modal) { max-width: 400px; }   /* compact profile modal */
+
+.pf-card {
+  display: flex; flex-direction: column; align-items: center; gap: var(--s-2);
+  margin: var(--s-4) 0 var(--s-5);
+}
+.pf-avatar {
+  width: 64px; height: 64px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--red); color: var(--txt-inv);
+  font-size: var(--fs-xl); font-weight: var(--fw-bold);
+}
+.pf-name { font-size: var(--fs-lg); font-weight: var(--fw-med); }
+
+.pf-rows { border-top: 1px solid var(--line); }
+.pf-row {
+  display: flex; justify-content: space-between; gap: var(--s-4);
+  padding: var(--s-3) 0; border-bottom: 1px solid var(--line);
+  font-size: var(--fs-sm);
+}
+.pf-label { color: var(--txt-mut); }
+.pf-value { font-weight: var(--fw-med); }
+
+.pf-footer { margin-top: var(--s-5); }
+.pf-footer .btn { width: 100%; }
+
 /* --- Spinners --- */
 .spinner {
   width: 36px; height: 36px; margin: var(--s-6) auto;

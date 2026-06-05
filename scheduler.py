@@ -62,31 +62,31 @@ def refresh_product(product):
             _refetch_listing(product, l)
 
 
-def refresh_product_guarded(product_id):
-    """On-demand refresh with a busy guard.
+def refresh_product_guarded(user_id, product_id):
+    """On-demand refresh of a user's product with a busy guard.
 
     Returns the updated product dict, or None if it is already refreshing
-    or does not exist.
+    or does not exist / not owned.
     """
     with _lock:
         if product_id in _refreshing:
             return None
         _refreshing.add(product_id)
     try:
-        product = storage.get_product(product_id)
+        product = storage.get_product(user_id, product_id)
         if not product:
             return None
         for l in product["listings"]:
             if l.get("url"):
                 _refetch_listing(product, l)
-        return storage.get_product(product_id)
+        return storage.get_product(user_id, product_id)
     finally:
         with _lock:
             _refreshing.discard(product_id)
 
 
 def refresh_all():
-    for product in storage.list_products():
+    for product in storage.all_products():
         refresh_product(product)
 
 

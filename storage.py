@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import select, delete
 
-from models import SessionLocal, Product, Listing
+from models import SessionLocal, Product, Listing, User
 
 
 def _now_iso():
@@ -67,10 +67,18 @@ def _listing_from(data):
     return Listing(**kwargs)
 
 
-def create_product(query, listings):
-    """Create a product from a query + list of pinned listings (dedup by URL)."""
+def _owned(s, product_id, user_id):
+    """Fetch a product only if it belongs to user_id (else None)."""
+    product = s.get(Product, product_id)
+    if product and product.user_id == user_id:
+        return product
+    return None
+
+
+def create_product(user_id, query, listings):
+    """Create a product owned by user_id (dedup listings by URL)."""
     with SessionLocal.begin() as s:
-        product = Product(id=_new_id(), query=query)
+        product = Product(id=_new_id(), user_id=user_id, query=query)
         seen = set()
         for l in listings:
             url = l.get("url")
@@ -82,10 +90,10 @@ def create_product(query, listings):
         return product.to_dict()
 
 
-def add_listings(product_id, listings):
-    """Append listings to an existing product, dedup by URL."""
+def add_listings(user_id, product_id, listings):
+    """Append listings to a user's product, dedup by URL."""
     with SessionLocal.begin() as s:
-        product = s.get(Product, product_id)
+        product = _owned(s, product_id, user_id)
         if not product:
             return None
         existing = {l.url for l in product.listings}
@@ -98,32 +106,35 @@ def add_listings(product_id, listings):
         return product.to_dict()
 
 
-def list_products():
+def list_products(user_id):
     with SessionLocal() as s:
-        rows = s.scalars(select(Product).order_by(Product.created_at.desc())).all()
+        rows = s.scalars(
+            select(Product).where(Product.user_id == user_id)
+            .order_by(Product.created_at.desc())
+        ).all()
         return [p.to_dict() for p in rows]
 
 
-def get_product(product_id):
+def get_product(user_id, product_id):
     with SessionLocal() as s:
-        product = s.get(Product, product_id)
+        product = _owned(s, product_id, user_id)
         return product.to_dict() if product else None
 
 
-def delete_product(product_id):
+def delete_product(user_id, product_id):
     with SessionLocal.begin() as s:
-        product = s.get(Product, product_id)
+        product = _owned(s, product_id, user_id)
         if not product:
             return False
         s.delete(product)
         return True
 
 
-def update_product(product_id, fields):
-    """Update editable product fields (title, cover_image)."""
+def update_product(user_id, product_id, fields):
+    """Update editable fields (title, cover_image) of a user's product."""
     allowed = {"title", "cover_image"}
     with SessionLocal.begin() as s:
-        product = s.get(Product, product_id)
+        product = _owned(s, product_id, user_id)
         if not product:
             return None
         for k, v in fields.items():
@@ -133,8 +144,23 @@ def update_product(product_id, fields):
         return product.to_dict()
 
 
+def remove_listing(user_id, product_id, url):
+    """Remove a single link from a user's product."""
+    with SessionLocal.begin() as s:
+        product = _owned(s, product_id, user_id)
+        if not product:
+            return False
+        before = len(product.listings)
+        for l in list(product.listings):
+            if l.url == url:
+                product.listings.remove(l)
+        s.flush()
+        return len(product.listings) < before
+
+
 def update_listing(product_id, url, fields):
-    """Update fields of one listing (by product + url)."""
+    """Update one listing (by product + url). Internal — used by the scheduler;
+    not user-scoped because it operates on products already fetched server-side."""
     with SessionLocal.begin() as s:
         product = s.get(Product, product_id)
         if not product:
@@ -151,15 +177,37 @@ def update_listing(product_id, url, fields):
         return None
 
 
-def remove_listing(product_id, url):
-    """Remove a single link from a product."""
-    with SessionLocal.begin() as s:
-        product = s.get(Product, product_id)
-        if not product:
-            return False
-        before = len(product.listings)
-        for l in list(product.listings):
-            if l.url == url:
-                product.listings.remove(l)
-        s.flush()
-        return len(product.listings) < before
+def all_products():
+    """Every product across users (for the 24h scheduler job)."""
+    with SessionLocal() as s:
+        return [p.to_dict() for p in s.scalars(select(Product)).all()]
+
+
+# =============================================================== users (DB)
+# User functions return the ORM object (Flask-Login needs it), detached so it
+# stays usable after the session closes.
+
+def _detach(s, user):
+    if user:
+        s.expunge(user)
+    return user
+
+
+def create_user(email, nickname, password_hash):
+    with SessionLocal() as s:
+        user = User(email=email, nickname=nickname, password_hash=password_hash)
+        s.add(user)
+        s.commit()
+        s.refresh(user)
+        return _detach(s, user)
+
+
+def get_user(user_id):
+    with SessionLocal() as s:
+        return _detach(s, s.get(User, user_id))
+
+
+def get_user_by_email(email):
+    with SessionLocal() as s:
+        user = s.scalars(select(User).where(User.email == email)).first()
+        return _detach(s, user)

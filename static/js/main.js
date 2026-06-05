@@ -6,6 +6,7 @@ import { initModal } from './modal.js';
 import { load } from './home.js';
 import { openDetail, onDetailReload } from './detail.js';
 import { startCreateWizard, onWizardDone } from './wizard.js';
+import { initProfile } from './profile.js';
 
 // cross-module callbacks (avoid circular imports)
 onDetailReload(load);
@@ -33,5 +34,6 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#themeBtn').addEventListener('click', toggleTheme);
   $('#langSelect').addEventListener('change', e => setLang(e.target.value));
 
+  initProfile();
   load();
 });
