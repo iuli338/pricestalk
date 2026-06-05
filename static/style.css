@@ -379,7 +379,6 @@ main { max-width: var(--maxw); margin: 0 auto; padding: var(--s-6) var(--s-5); }
   caret-color: var(--red);
 }
 .title-input:focus { outline: none; border-color: var(--red); }
-.dt-search { font-size: var(--fs-sm); margin: var(--s-1) 0 0; }
 
 /* image picker */
 .pick-grid {
@@ -396,3 +395,7 @@ main { max-width: var(--maxw); margin: 0 auto; padding: var(--s-6) var(--s-5); }
 
 .lp-slot { display: inline-flex; align-items: center; gap: 2px; }
 .lp.drop { color: var(--red); }
+
+/* tag icon next to the cheapest link's price */
+.cheapest-ico { color: var(--red); display: inline-flex; align-items: center; }
+.cheapest-ico .tag-ico { width: 15px; height: 15px; }

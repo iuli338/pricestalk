@@ -79,12 +79,20 @@ function wizardSteps(){
   }).join('<span class="wz-sep">›</span>');
 }
 
+// sort: available + priced ascending first, no-price / out-of-stock last
+function byPriceAsc(a, b){
+  const rank = it => (it.available !== false && it.price > 0) ? 0 : 1;
+  const ra = rank(a), rb = rank(b);
+  if(ra !== rb) return ra - rb;
+  return (a.price ?? Infinity) - (b.price ?? Infinity);
+}
+
 function renderWizard(){
   const isSummary = WZ.step >= STEPS.length;
   if(isSummary) return renderSummary();
 
   const step = STEPS[WZ.step];
-  const items = WZ.draft.results[step.key] || [];
+  const items = [...(WZ.draft.results[step.key] || [])].sort(byPriceAsc);
   const cards = items.length ? items.map(it => listingCard(it, step.pinnable)).join('')
     : `<p class="muted">No results from ${step.label}.</p>`;
 
@@ -195,6 +203,8 @@ async function openDetail(id){
   const thumb = l => l.image
     ? `<div class="ln-img" style="background-image:url('${esc(l.image)}')"></div>`
     : `<div class="ln-img ln-noimg"></div>`;
+  // URL of the cheapest available, priced link (gets the tag icon)
+  const cheapestUrl = cheapestLinkUrl(p.listings);
   const groups = Object.entries(bySite).map(([site,ls]) => `
     <h3>${site} <span class="muted">· ${ls.length}</span></h3>
     ${ls.map(l => `
@@ -202,8 +212,7 @@ async function openDetail(id){
         ${thumb(l)}
         <a class="ln-title" href="${l.url||'#'}" target="_blank">${esc(l.title||l.url)}</a>
         <span class="lp-slot" id="${slotId(l.url)}">
-          <span class="lp">${fmt(l.price)||'—'}</span>
-          ${l.available===false?'<span class="oos"> · out of stock</span>':''}
+          ${linkPriceHtml(l, l.url===cheapestUrl)}
         </span>
       </div>`).join('')}`).join('') || '<p class="muted">No links.</p>';
 
@@ -222,7 +231,7 @@ async function openDetail(id){
         <div id="dtTitle">${titleView(p)}</div>
         <div class="price ${p.min_price==null?'none':''}" id="dtMin">${p.min_price!=null?fmt(p.min_price):'No price yet'}</div>
         <p class="muted">Lowest across ${p.listing_count} link(s)</p>
-        <p class="dt-search">initial search text: <span class="muted">${esc(p.query)}</span></p>
+        <p class="muted">initial search text: ${esc(p.query)}</p>
         <div class="row" style="margin-top:8px">
           <button class="btn btn-sm" id="refreshBtn" onclick="refreshDetail('${id}')">Refresh prices</button>
           <button class="btn btn-sm" onclick="delProduct('${id}')">Delete</button>
@@ -233,6 +242,25 @@ async function openDetail(id){
 }
 
 const PENCIL = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+// price tag icon, shown next to the lowest price
+const TAG = '<svg class="tag-ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0l-7.2-7.2A2 2 0 0 1 2.8 12V4a2 2 0 0 1 2-2h8a2 2 0 0 1 1.4.6l6.4 6.4a2 2 0 0 1 0 2.4Z"/><circle cx="7.5" cy="7.5" r="1.2" fill="currentColor"/></svg>';
+
+// URL of the cheapest available, priced listing
+function cheapestLinkUrl(listings){
+  let best = null;
+  for(const l of listings){
+    if(l.available !== false && l.price > 0 && (!best || l.price < best.price)) best = l;
+  }
+  return best ? best.url : null;
+}
+
+// price cell for a link; cheapest one shows the tag icon
+function linkPriceHtml(l, isCheapest){
+  const price = `<span class="lp">${fmt(l.price)||'—'}</span>`;
+  const oos = l.available===false ? '<span class="oos"> · out of stock</span>' : '';
+  const tag = isCheapest ? `<span class="cheapest-ico" title="Lowest price">${TAG}</span>` : '';
+  return `${tag}${price}${oos}`;
+}
 
 function titleView(p){
   return `<h2 class="dt-title-text">${esc(p.title)}
@@ -289,18 +317,25 @@ async function refreshDetail(id){
   if(b){ b.disabled = true; b.textContent = 'Refreshing…'; }
   const p = await api('/api/products/'+id);
   let lastMin = null;
+  const fresh = [];  // updated listing state, to recompute cheapest after
   for(const l of p.listings){
     if(!l.url) continue;
     const slot = document.getElementById(slotId(l.url));
     if(slot) slot.innerHTML = '<span class="mini-spinner"></span>';
     const res = await post('/api/products/'+id+'/refresh-one', {url: l.url});
     lastMin = res.min_price;
-    if(slot){
-      const priceTxt = res.price!=null ? fmt(res.price) : (res.error ? 'error' : '—');
-      slot.innerHTML =
-        `<span class="lp ${res.dropped?'drop':''}">${priceTxt}${res.dropped?' ↓':''}</span>` +
-        (res.available===false?'<span class="oos"> · out of stock</span>':'');
-    }
+    fresh.push({url: l.url, price: res.price, available: res.available, dropped: res.dropped, error: res.error});
+  }
+  // re-render every slot now that prices are final; tag the cheapest
+  const cheapestUrl = cheapestLinkUrl(fresh);
+  for(const f of fresh){
+    const slot = document.getElementById(slotId(f.url));
+    if(!slot) continue;
+    const priceTxt = f.price!=null ? fmt(f.price) : (f.error ? 'error' : '—');
+    const tag = f.url===cheapestUrl ? `<span class="cheapest-ico" title="Lowest price">${TAG}</span>` : '';
+    slot.innerHTML = tag +
+      `<span class="lp ${f.dropped?'drop':''}">${priceTxt}${f.dropped?' ↓':''}</span>` +
+      (f.available===false?'<span class="oos"> · out of stock</span>':'');
   }
   const minEl = $('#dtMin');
   if(minEl){
