@@ -4,24 +4,42 @@ Track the minimum price of product *ideas* across Romanian retail sites. Concept
 
 A product is a search term (e.g. `rtx 5050 laptop`) holding pinned listings from different sites. Its card shows the lowest in-stock price. Every 24h the app re-scouts for new listings to confirm.
 
-Stack: Python · Flask · BeautifulSoup · JSON storage · APScheduler · vanilla JS.
+Stack: Python · Flask (app factory) · SQLAlchemy + SQLite · BeautifulSoup ·
+APScheduler · vanilla JS (native ESM).
 
-## Run
+## Run (dev)
 
 ```bash
 pip install -r requirements.txt
 python app.py
 ```
 
-http://localhost:5000
+http://localhost:5000 — creates `pricestalk.db` automatically.
+
+## Run (production)
+
+Set env vars (see `.env.example`), then serve with gunicorn:
+
+```bash
+export SECRET_KEY=<long-random-string>
+export DEBUG=0
+gunicorn app:app -b 0.0.0.0:8000
+```
+
+SQLite stores data in `pricestalk.db` — host on a box with a **persistent disk**
+(VPS, or Fly.io/Render with a volume), not an ephemeral filesystem. To move to
+Postgres later, set `DATABASE_URL=postgresql+psycopg://…`; models/queries are unchanged.
 
 ## Files
 
 ```
-app.py                 Flask routes / REST API
+app.py                 Flask app factory + routes / REST API
+config.py              settings from env vars
+models.py              SQLAlchemy models (Product, Listing)
+storage.py             data access (DB for products; memory for wizard drafts)
+presenter.py           product -> UI shape (min price, counts, defaults)
 scraper.py             search (eMAG/Altex/Compari) + price fetch
-storage.py             JSON persistence (drafts + product entities)
-scheduler.py           24h price-drop re-fetch
+scheduler.py           periodic price-drop re-fetch
 templates/index.html   page markup (module entry: static/js/main.js)
 tokens.css             design tokens (light/dark themes)
 
@@ -45,7 +63,7 @@ static/js/             ES modules (native, no build step)
   wizard.js            scout wizard (create + append modes)
   detail.js            detail modal (edit, picker, refresh, remove, add-links)
 
-data.json              storage (gitignored)
+pricestalk.db          SQLite database (gitignored)
 ```
 
 Frontend is a buildless native-ESM SPA: `index.html` is structure only, CSS is

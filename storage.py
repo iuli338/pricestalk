@@ -1,186 +1,165 @@
-"""JSON-backed storage: wizard drafts + finalized product entities.
+"""Data access layer.
 
-Drafts hold scout results only; pinning is client-side. The client sends the
-final listing list on create/add-links.
+Products/listings are persisted in the database (SQLite via SQLAlchemy).
+Wizard drafts (scout results) are ephemeral and kept in memory only.
 
-Schema (data.json):
-{
-  "drafts":   [ {id, query, created_at, results:{emag,altex,compari}} ],
-  "products": [ {id, query, created_at, listings:[listing...], title?, cover_image?} ]
-}
-A listing: {url, title, price, currency, site, image, available, last_checked}
+All functions return plain dicts (not ORM objects), so the rest of the app is
+storage-agnostic.
 """
-import json
-import os
 import threading
 import uuid
 from datetime import datetime, timezone
 
-DATA_FILE = os.path.join(os.path.dirname(__file__), "data.json")
-_lock = threading.Lock()
+from sqlalchemy import select, delete
+
+from models import SessionLocal, Product, Listing
 
 
-def _now():
+def _now_iso():
     return datetime.now(timezone.utc).isoformat()
 
 
-def _load():
-    if not os.path.exists(DATA_FILE):
-        return {"drafts": [], "products": []}
-    with open(DATA_FILE, "r", encoding="utf-8") as f:
-        try:
-            data = json.load(f)
-        except json.JSONDecodeError:
-            return {"drafts": [], "products": []}
-    data.setdefault("drafts", [])
-    data.setdefault("products", [])
-    return data
+def _new_id():
+    return uuid.uuid4().hex[:8]
 
 
-def _save(data):
-    tmp = DATA_FILE + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
-    os.replace(tmp, DATA_FILE)
+# ============================================================ drafts (memory)
+# Drafts hold per-site scout results during a wizard session. They are large,
+# short-lived and per-session, so they live in memory, not the DB.
 
+_drafts = {}
+_drafts_lock = threading.Lock()
 
-def _find(items, item_id):
-    return next((x for x in items if x["id"] == item_id), None)
-
-
-# ------------------------------------------------------------------ drafts
 
 def create_draft(query, results):
-    """Create a wizard draft holding per-site scout results."""
-    with _lock:
-        data = _load()
+    with _drafts_lock:
         draft = {
-            "id": uuid.uuid4().hex[:8],
+            "id": _new_id(),
             "query": query,
-            "created_at": _now(),
+            "created_at": _now_iso(),
             "results": results,   # {emag:[...], altex:[...], compari:[...]}
         }
-        data["drafts"].append(draft)
-        _save(data)
+        _drafts[draft["id"]] = draft
         return draft
 
 
 def get_draft(draft_id):
-    with _lock:
-        return _find(_load()["drafts"], draft_id)
+    with _drafts_lock:
+        return _drafts.get(draft_id)
 
 
 def discard_draft(draft_id):
-    with _lock:
-        data = _load()
-        before = len(data["drafts"])
-        data["drafts"] = [d for d in data["drafts"] if d["id"] != draft_id]
-        _save(data)
-        return len(data["drafts"]) < before
+    with _drafts_lock:
+        return _drafts.pop(draft_id, None) is not None
 
 
-# ---------------------------------------------------------------- products
+# ============================================================ products (DB)
 
-def _clean_listing(l):
-    """Keep only the listing fields we persist; stamp last_checked."""
-    out = {k: l.get(k) for k in
-           ("url", "title", "price", "currency", "site", "image", "available")}
-    out["last_checked"] = _now()
-    return out
+_LISTING_FIELDS = ("url", "title", "price", "currency", "site", "image", "available")
+
+
+def _listing_from(data):
+    """Build a Listing from incoming dict, keeping only known fields."""
+    kwargs = {k: data.get(k) for k in _LISTING_FIELDS if data.get(k) is not None}
+    kwargs.setdefault("currency", "RON")
+    kwargs.setdefault("available", True)
+    kwargs["last_checked"] = datetime.now(timezone.utc)
+    return Listing(**kwargs)
 
 
 def create_product(query, listings):
-    """Create a product entity from a query + list of pinned listings."""
-    with _lock:
-        data = _load()
-        seen, clean = set(), []
+    """Create a product from a query + list of pinned listings (dedup by URL)."""
+    with SessionLocal.begin() as s:
+        product = Product(id=_new_id(), query=query)
+        seen = set()
         for l in listings:
-            if l.get("url") and l["url"] not in seen:
-                seen.add(l["url"])
-                clean.append(_clean_listing(l))
-        product = {
-            "id": uuid.uuid4().hex[:8],
-            "query": query,
-            "created_at": _now(),
-            "listings": clean,
-        }
-        data["products"].append(product)
-        _save(data)
-        return product
+            url = l.get("url")
+            if url and url not in seen:
+                seen.add(url)
+                product.listings.append(_listing_from(l))
+        s.add(product)
+        s.flush()
+        return product.to_dict()
 
 
 def add_listings(product_id, listings):
     """Append listings to an existing product, dedup by URL."""
-    with _lock:
-        data = _load()
-        product = _find(data["products"], product_id)
+    with SessionLocal.begin() as s:
+        product = s.get(Product, product_id)
         if not product:
             return None
-        existing = {l.get("url") for l in product["listings"]}
+        existing = {l.url for l in product.listings}
         for l in listings:
-            if l.get("url") and l["url"] not in existing:
-                existing.add(l["url"])
-                product["listings"].append(_clean_listing(l))
-        _save(data)
-        return product
+            url = l.get("url")
+            if url and url not in existing:
+                existing.add(url)
+                product.listings.append(_listing_from(l))
+        s.flush()
+        return product.to_dict()
 
 
 def list_products():
-    with _lock:
-        return _load()["products"]
+    with SessionLocal() as s:
+        rows = s.scalars(select(Product).order_by(Product.created_at.desc())).all()
+        return [p.to_dict() for p in rows]
 
 
 def get_product(product_id):
-    with _lock:
-        return _find(_load()["products"], product_id)
+    with SessionLocal() as s:
+        product = s.get(Product, product_id)
+        return product.to_dict() if product else None
 
 
 def delete_product(product_id):
-    with _lock:
-        data = _load()
-        before = len(data["products"])
-        data["products"] = [p for p in data["products"] if p["id"] != product_id]
-        _save(data)
-        return len(data["products"]) < before
+    with SessionLocal.begin() as s:
+        product = s.get(Product, product_id)
+        if not product:
+            return False
+        s.delete(product)
+        return True
 
 
 def update_product(product_id, fields):
     """Update editable product fields (title, cover_image)."""
     allowed = {"title", "cover_image"}
-    with _lock:
-        data = _load()
-        product = _find(data["products"], product_id)
+    with SessionLocal.begin() as s:
+        product = s.get(Product, product_id)
         if not product:
             return None
         for k, v in fields.items():
             if k in allowed:
-                product[k] = v
-        _save(data)
-        return product
+                setattr(product, k, v)
+        s.flush()
+        return product.to_dict()
 
 
 def update_listing(product_id, url, fields):
-    with _lock:
-        data = _load()
-        product = _find(data["products"], product_id)
+    """Update fields of one listing (by product + url)."""
+    with SessionLocal.begin() as s:
+        product = s.get(Product, product_id)
         if not product:
             return None
-        for l in product["listings"]:
-            if l.get("url") == url:
-                l.update(fields)
-                _save(data)
-                return l
+        for l in product.listings:
+            if l.url == url:
+                for k, v in fields.items():
+                    if hasattr(l, k):
+                        if k == "last_checked" and isinstance(v, str):
+                            v = datetime.fromisoformat(v)
+                        setattr(l, k, v)
+                s.flush()
+                return l.to_dict()
         return None
 
 
 def remove_listing(product_id, url):
-    """Remove a single link from a saved product."""
-    with _lock:
-        data = _load()
-        product = _find(data["products"], product_id)
+    """Remove a single link from a product."""
+    with SessionLocal.begin() as s:
+        product = s.get(Product, product_id)
         if not product:
             return False
-        before = len(product["listings"])
-        product["listings"] = [l for l in product["listings"] if l.get("url") != url]
-        _save(data)
-        return len(product["listings"]) < before
+        before = len(product.listings)
+        for l in list(product.listings):
+            if l.url == url:
+                product.listings.remove(l)
+        s.flush()
+        return len(product.listings) < before

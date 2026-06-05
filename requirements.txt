@@ -1,5 +1,7 @@
 Flask==3.0.3
+SQLAlchemy==2.0.50
 requests==2.32.3
 curl_cffi==0.15.0
 beautifulsoup4==4.12.3
 APScheduler==3.10.4
+gunicorn==23.0.0
