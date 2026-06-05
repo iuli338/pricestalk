@@ -21,9 +21,14 @@
     <div class="header-inner">
       <div class="brand">
         <span class="name">Price<span class="accent">Stalk</span></span>
-        <span class="tag">Romania · RON</span>
+        <span class="tag" data-i18n="app.tag">Romania · RON</span>
       </div>
       <div class="header-actions">
+        <select id="langSelect" class="lang-select" data-i18n-title="header.lang"
+                title="Language" onchange="setLang(this.value)">
+          <option value="en">EN</option>
+          <option value="ro">RO</option>
+        </select>
         <button class="btn btn-icon" id="themeBtn" title="Toggle theme" onclick="toggleTheme()">◑</button>
       </div>
     </div>
@@ -33,13 +38,14 @@
     <div class="search-wrap">
       <div class="search">
         <input id="q" class="input" type="text"
+               data-i18n-ph="search.placeholder"
                placeholder='Add a product, e.g. "rtx 5050 laptop"'
                onkeydown="if(event.key==='Enter')addProduct()">
-        <button class="btn btn-primary" onclick="addProduct()">Add</button>
+        <button class="btn btn-primary" data-i18n="search.add" onclick="addProduct()">Add</button>
       </div>
     </div>
     <div id="grid" class="grid"></div>
-    <div id="empty" class="empty" style="display:none">No products yet. Add one above to start tracking.</div>
+    <div id="empty" class="empty" data-i18n="home.empty" style="display:none">No products yet. Add one above to start tracking.</div>
   </main>
 
   <div id="modalBg" class="modal-bg">
@@ -47,6 +53,7 @@
   </div>
   <div id="toast" class="toast"></div>
 
+  <script src="{{ url_for('static', filename='i18n.js') }}"></script>
   <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>

@@ -33,15 +33,15 @@ function entityCard(p){
   el.onclick = () => openDetail(p.id);
   const price = p.min_price != null
     ? `<div class="price">${fmt(p.min_price)}</div>`
-    : `<div class="price none">No price yet</div>`;
+    : `<div class="price none">${t('card.no_price')}</div>`;
   const img = p.cover_image
     ? `<div class="card-img" style="background-image:url('${esc(p.cover_image)}')"></div>`
-    : `<div class="card-img lc-noimg">no image</div>`;
+    : `<div class="card-img lc-noimg">${t('wizard.no_image')}</div>`;
   el.innerHTML = `
     ${img}
     <h3>${esc(p.title || p.query)}</h3>
     ${price}
-    <div class="meta">lowest of ${p.listing_count} link(s)</div>`;
+    <div class="meta">${t('home.lowest_of', {n: p.listing_count})}</div>`;
   return el;
 }
 
@@ -67,8 +67,8 @@ async function addProduct(){
 
 function openWizardLoading(q){
   openModal(`
-    <h2>Scouting “${esc(q)}”…</h2>
-    <p class="muted">Searching eMAG, Altex and Compari. This can take a moment.</p>
+    <h2>${t('wizard.scouting', {q: esc(q)})}</h2>
+    <p class="muted">${t('wizard.scouting_note')}</p>
     <div class="spinner"></div>`, false);
 }
 
@@ -94,22 +94,20 @@ function renderWizard(){
   const step = STEPS[WZ.step];
   const items = [...(WZ.draft.results[step.key] || [])].sort(byPriceAsc);
   const cards = items.length ? items.map(it => listingCard(it, step.pinnable)).join('')
-    : `<p class="muted">No results from ${step.label}.</p>`;
+    : `<p class="muted">${t('wizard.no_results', {site: step.label})}</p>`;
 
-  const note = step.pinnable
-    ? `Pin the listings you want to track.`
-    : `Compari shows the lowest market price — reference only, nothing to pin here.`;
+  const note = step.pinnable ? t('wizard.pin_note') : t('wizard.compari_note');
 
   openModal(`
     <div class="wz-head">${wizardSteps()}</div>
-    <h2>${step.label} <span class="muted">· ${items.length} found</span></h2>
+    <h2>${step.label} <span class="muted">· ${t('wizard.found', {n: items.length})}</span></h2>
     <p class="muted">${note}</p>
     <div class="wz-grid">${cards}</div>
     <div class="wz-nav">
-      <button class="btn" onclick="cancelWizard()">Cancel</button>
+      <button class="btn" onclick="cancelWizard()">${t('wizard.cancel')}</button>
       <div class="row">
-        ${WZ.step>0 ? `<button class="btn" onclick="wizPrev()">Back</button>`:''}
-        <button class="btn btn-primary" onclick="wizNext()">${WZ.step===STEPS.length-1?'Review':'Next'}</button>
+        ${WZ.step>0 ? `<button class="btn" onclick="wizPrev()">${t('wizard.back')}</button>`:''}
+        <button class="btn btn-primary" onclick="wizNext()">${WZ.step===STEPS.length-1?t('wizard.review'):t('wizard.next')}</button>
       </div>
     </div>`);
 }
@@ -119,16 +117,16 @@ function listingCard(it, pinnable){
   const oos = it.available === false;
   const img = it.image
     ? `<div class="lc-img" style="background-image:url('${esc(it.image)}')"></div>`
-    : `<div class="lc-img lc-noimg">no image</div>`;
+    : `<div class="lc-img lc-noimg">${t('wizard.no_image')}</div>`;
   const pinBtn = pinnable
     ? `<button class="btn btn-sm ${pinned?'':'btn-primary'} lc-pin" ${pinned?'disabled':''}
-         onclick='wizPin(${JSON.stringify(it).replace(/'/g,"&#39;")}, this)'>${pinned?'Pinned ✓':'Pin'}</button>`
-    : `<span class="lc-ref">market price</span>`;
+         onclick='wizPin(${JSON.stringify(it).replace(/'/g,"&#39;")}, this)'>${pinned?t('wizard.pinned'):t('wizard.pin')}</button>`
+    : `<span class="lc-ref">${t('wizard.market_price')}</span>`;
   return `
     <div class="lc${oos?' lc-oos':''}">
       ${img}
       <div class="lc-title" title="${esc(it.title)}">${esc(it.title)}</div>
-      <div class="lc-price">${fmt(it.price)||'—'}${oos?'<span class="oos"> · out of stock</span>':''}</div>
+      <div class="lc-price">${fmt(it.price)||'—'}${oos?`<span class="oos"> · ${t('wizard.oos')}</span>`:''}</div>
       ${pinBtn}
     </div>`;
 }
@@ -136,8 +134,8 @@ function listingCard(it, pinnable){
 async function wizPin(it, btn){
   btn.disabled = true; btn.textContent = '…';
   const res = await post(`/api/drafts/${WZ.draft.id}/pin`, it);
-  if(res && res.url){ WZ.pinned.add(res.url); btn.textContent='Pinned ✓'; }
-  else { btn.disabled=false; btn.textContent='Pin'; }
+  if(res && res.url){ WZ.pinned.add(res.url); btn.textContent=t('wizard.pinned'); }
+  else { btn.disabled=false; btn.textContent=t('wizard.pin'); }
 }
 
 function wizNext(){ WZ.step++; renderWizard(); }
@@ -151,18 +149,18 @@ async function renderSummary(){
   const minP = Math.min(...pinned.filter(l=>l.price>0).map(l=>l.price));
   const groups = Object.keys(bySite).length ? Object.entries(bySite).map(([site,ls]) => `
     <h3>${site} <span class="muted">· ${ls.length}</span></h3>
-    ${ls.map(l => summaryRow(l)).join('')}`).join('') : '<p class="muted">No links pinned. Go back to pin some.</p>';
+    ${ls.map(l => summaryRow(l)).join('')}`).join('') : `<p class="muted">${t('wizard.no_pinned')}</p>`;
 
   openModal(`
-    <div class="wz-head">${STEPS.map(s=>`<div class="wz-step done">${s.label}</div>`).join('<span class="wz-sep">›</span>')} <span class="wz-sep">›</span> <div class="wz-step active">Summary</div></div>
-    <h2>Review</h2>
-    <p class="muted">“${esc(draft.query)}” · ${pinned.length} link(s)${pinned.length?` · lowest ${fmt(minP)}`:''}</p>
+    <div class="wz-head">${STEPS.map(s=>`<div class="wz-step done">${s.label}</div>`).join('<span class="wz-sep">›</span>')} <span class="wz-sep">›</span> <div class="wz-step active">${t('wizard.summary')}</div></div>
+    <h2>${t('wizard.review')}</h2>
+    <p class="muted">${t('wizard.summary_meta', {q: esc(draft.query), n: pinned.length})}${pinned.length?t('wizard.summary_lowest', {price: fmt(minP)}):''}</p>
     ${groups}
     <div class="wz-nav">
-      <button class="btn" onclick="cancelWizard()">Cancel</button>
+      <button class="btn" onclick="cancelWizard()">${t('wizard.cancel')}</button>
       <div class="row">
-        <button class="btn" onclick="WZ.step=${STEPS.length-1};renderWizard()">Back</button>
-        <button class="btn btn-primary" ${pinned.length?'':'disabled'} onclick="finalizeWizard()">Finalize</button>
+        <button class="btn" onclick="WZ.step=${STEPS.length-1};renderWizard()">${t('wizard.back')}</button>
+        <button class="btn btn-primary" ${pinned.length?'':'disabled'} onclick="finalizeWizard()">${t('wizard.finalize')}</button>
       </div>
     </div>`);
 }
@@ -178,7 +176,7 @@ async function finalizeWizard(){
   await post(`/api/drafts/${WZ.draft.id}/finalize`);
   WZ = null;
   closeModal();
-  toast('Product saved.');
+  toast(t('wizard.saved'));
   load();
 }
 
@@ -210,9 +208,9 @@ async function openDetail(id){
     ${ls.map(l => `
       <div class="listing${l.url===cheapestUrl?' cheapest':''}">
         <div class="ln-menu">
-          <button class="kebab" title="Actions" onclick="toggleMenu(event)">${KEBAB}</button>
+          <button class="kebab" title="${t('detail.actions')}" onclick="toggleMenu(event)">${KEBAB}</button>
           <div class="menu">
-            <button class="menu-item danger" onclick='removeLink("${id}", ${JSON.stringify(l.url)})'>Remove</button>
+            <button class="menu-item danger" onclick='removeLink("${id}", ${JSON.stringify(l.url)})'>${t('detail.remove')}</button>
           </div>
         </div>
         ${thumb(l)}
@@ -220,27 +218,27 @@ async function openDetail(id){
         <span class="lp-slot" id="${slotId(l.url)}">
           ${linkPriceHtml(l, l.url===cheapestUrl)}
         </span>
-      </div>`).join('')}`).join('') || '<p class="muted">No links.</p>';
+      </div>`).join('')}`).join('') || `<p class="muted">${t('detail.no_links')}</p>`;
 
   const coverHtml = p.cover_image
     ? `<div class="dt-img" style="background-image:url('${esc(p.cover_image)}')"></div>`
-    : `<div class="dt-img lc-noimg">no image</div>`;
+    : `<div class="dt-img lc-noimg">${t('wizard.no_image')}</div>`;
 
   openModal(`
-    <button class="btn btn-sm close" onclick="closeModal()">Close</button>
+    <button class="btn btn-sm close" onclick="closeModal()">${t('detail.close')}</button>
     <div class="dt-head">
-      <div class="dt-img-wrap" onclick="openImagePicker('${id}')" title="Change image">
+      <div class="dt-img-wrap" onclick="openImagePicker('${id}')" title="${t('detail.change_image')}">
         ${coverHtml}
         <span class="dt-img-edit">${PENCIL}</span>
       </div>
       <div class="dt-info">
         <div id="dtTitle">${titleView(p)}</div>
-        <div class="price ${p.min_price==null?'none':''}" id="dtMin">${p.min_price!=null?fmt(p.min_price):'No price yet'}</div>
-        <p class="muted">Lowest across ${p.listing_count} link(s)</p>
-        <p class="muted">initial search text: ${esc(p.query)}</p>
+        <div class="price ${p.min_price==null?'none':''}" id="dtMin">${p.min_price!=null?fmt(p.min_price):t('detail.no_price')}</div>
+        <p class="muted">${t('detail.lowest_across', {n: p.listing_count})}</p>
+        <p class="muted">${t('detail.initial_search', {q: esc(p.query)})}</p>
         <div class="row" style="margin-top:8px">
-          <button class="btn btn-sm" id="refreshBtn" onclick="refreshDetail('${id}')">Refresh prices</button>
-          <button class="btn btn-sm" onclick="delProduct('${id}')">Delete</button>
+          <button class="btn btn-sm" id="refreshBtn" onclick="refreshDetail('${id}')">${t('detail.refresh')}</button>
+          <button class="btn btn-sm" onclick="delProduct('${id}')">${t('detail.delete')}</button>
         </div>
       </div>
     </div>
@@ -267,7 +265,7 @@ document.addEventListener('click', () => {
 });
 
 async function removeLink(id, url){
-  if(!confirm('Remove this link?')) return;
+  if(!confirm(t('detail.remove_confirm'))) return;
   await fetch('/api/products/'+id+'/listings', {method:'DELETE', headers:{'Content-Type':'application/json'}, body: JSON.stringify({url})});
   openDetail(id);
   load();
@@ -285,14 +283,14 @@ function cheapestLinkUrl(listings){
 // price cell for a link; cheapest one shows the tag icon
 function linkPriceHtml(l, isCheapest){
   const price = `<span class="lp">${fmt(l.price)||'—'}</span>`;
-  const oos = l.available===false ? '<span class="oos"> · out of stock</span>' : '';
-  const tag = isCheapest ? `<span class="cheapest-ico" title="Lowest price">${TAG}</span>` : '';
+  const oos = l.available===false ? `<span class="oos"> · ${t('wizard.oos')}</span>` : '';
+  const tag = isCheapest ? `<span class="cheapest-ico" title="${t('detail.lowest_price')}">${TAG}</span>` : '';
   return `${tag}${price}${oos}`;
 }
 
 function titleView(p){
   return `<h2 class="dt-title-text">${esc(p.title)}
-    <button class="btn-edit" title="Edit title" onclick="editTitle('${p.id}')">${PENCIL}</button></h2>`;
+    <button class="btn-edit" title="${t('title.edit')}" onclick="editTitle('${p.id}')">${PENCIL}</button></h2>`;
 }
 
 function editTitle(id){
@@ -302,8 +300,8 @@ function editTitle(id){
       <input id="titleInput" class="title-input" type="text" value="${esc(cur)}"
              onkeydown="if(event.key==='Enter')saveTitle('${id}');if(event.key==='Escape')cancelTitle()">
       <div class="row" style="margin-top:6px">
-        <button class="btn btn-sm btn-primary" onclick="saveTitle('${id}')">Save</button>
-        <button class="btn btn-sm" onclick="cancelTitle()">Cancel</button>
+        <button class="btn btn-sm btn-primary" onclick="saveTitle('${id}')">${t('title.save')}</button>
+        <button class="btn btn-sm" onclick="cancelTitle()">${t('title.cancel')}</button>
       </div>
     </div>`;
   const inp = $('#titleInput'); inp.focus(); inp.select();
@@ -325,11 +323,11 @@ function openImagePicker(id){
     <div class="pick-tile ${src===DETAIL.cover_image?'sel':''}"
          style="background-image:url('${esc(src)}')"
          onclick="pickImage('${id}', '${esc(src)}')"></div>`).join('')
-    : '<p class="muted">No images available from the pinned links.</p>';
+    : `<p class="muted">${t('picker.none')}</p>`;
   openModal(`
-    <button class="btn btn-sm close" onclick="openDetail('${id}')">Back</button>
-    <h2>Choose image</h2>
-    <p class="muted">Pick a cover image from the pinned links.</p>
+    <button class="btn btn-sm close" onclick="openDetail('${id}')">${t('picker.back')}</button>
+    <h2>${t('picker.choose')}</h2>
+    <p class="muted">${t('picker.note')}</p>
     <div class="pick-grid">${tiles}</div>`);
 }
 
@@ -342,7 +340,7 @@ async function pickImage(id, src){
 // Refresh link-by-link: spinner on each price slot, then show the new price.
 async function refreshDetail(id){
   const b = $('#refreshBtn');
-  if(b){ b.disabled = true; b.textContent = 'Refreshing…'; }
+  if(b){ b.disabled = true; b.textContent = t('detail.refreshing'); }
   const p = await api('/api/products/'+id);
   let lastMin = null;
   const fresh = [];  // updated listing state, to recompute cheapest after
@@ -360,24 +358,24 @@ async function refreshDetail(id){
     const slot = document.getElementById(slotId(f.url));
     if(!slot) continue;
     const isCheapest = f.url===cheapestUrl;
-    const priceTxt = f.price!=null ? fmt(f.price) : (f.error ? 'error' : '—');
-    const tag = isCheapest ? `<span class="cheapest-ico" title="Lowest price">${TAG}</span>` : '';
+    const priceTxt = f.price!=null ? fmt(f.price) : (f.error ? t('detail.error') : '—');
+    const tag = isCheapest ? `<span class="cheapest-ico" title="${t('detail.lowest_price')}">${TAG}</span>` : '';
     slot.innerHTML = tag +
       `<span class="lp ${f.dropped?'drop':''}">${priceTxt}${f.dropped?' ↓':''}</span>` +
-      (f.available===false?'<span class="oos"> · out of stock</span>':'');
+      (f.available===false?`<span class="oos"> · ${t('wizard.oos')}</span>`:'');
     slot.closest('.listing').classList.toggle('cheapest', isCheapest);
   }
   const minEl = $('#dtMin');
   if(minEl){
-    minEl.textContent = lastMin!=null ? fmt(lastMin) : 'No price yet';
+    minEl.textContent = lastMin!=null ? fmt(lastMin) : t('detail.no_price');
     minEl.classList.toggle('none', lastMin==null);
   }
-  if(b){ b.disabled = false; b.textContent = 'Refresh prices'; }
+  if(b){ b.disabled = false; b.textContent = t('detail.refresh'); }
   load();
 }
 
 async function delProduct(id){
-  if(!confirm('Delete this product?')) return;
+  if(!confirm(t('detail.delete_confirm'))) return;
   await fetch('/api/products/'+id, {method:'DELETE'});
   closeModal();
   load();
@@ -386,8 +384,8 @@ async function delProduct(id){
 // ===================================================================
 async function checkNotifications(){
   const n = await api('/api/notifications?clear=1');
-  if(!n.length){ toast('No price drops.'); return; }
-  toast(`${n.length} price drop(s) detected. Open a product to see.`);
+  if(!n.length){ toast(t('notif.none')); return; }
+  toast(t('notif.some', {n: n.length}));
   load();
 }
 
@@ -401,6 +399,8 @@ function openModal(html, dismissable=true){
 function closeModal(){ $('#modalBg').classList.remove('open'); }
 
 document.addEventListener('DOMContentLoaded', () => {
+  document.documentElement.lang = LANG;
+  applyStaticI18n();   // translate static DOM + set dropdown value
   $('#modalBg').addEventListener('click', e => {
     if(e.target === $('#modalBg') && $('#modalBg').dataset.dismissable === '1'){
       if(WZ) cancelWizard(); else closeModal();

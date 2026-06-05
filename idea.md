@@ -28,5 +28,5 @@ A product entry is not a single listing — it's a spec/idea (e.g. "rtx 5050 lap
 
 - **Region:** Romania
 - **Currency:** Lei (RON)
-- **App language:** English
+- **App language:** English + Romanian (UI language switch)
 - **Stack:** Python, web scraping, Flask backend, JSON storage, simple web UI.

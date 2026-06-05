@@ -25,9 +25,10 @@ scheduler.py           24h re-scout: refresh prices + find new listings
 templates/index.html   page markup
 static/style.css       styling
 static/app.js          UI logic (fetch API, render, modals)
+static/i18n.js         translations (EN/RO) + t() helper
 data.json              storage (gitignored)
 ```
 
 UI split: `index.html` is structure only, `style.css` all styling, `app.js` all logic.
 
-Region: Romania · Currency: RON · Language: English. Scraping is best-effort; selectors may need updates over time.
+Region: Romania · Currency: RON · Language: English + Romanian (switchable in the header). Scraping is best-effort; selectors may need updates over time.

@@ -105,6 +105,15 @@ body {
   display: inline-flex; align-items: center; justify-content: center;
   padding: 0; border-radius: var(--r);
 }
+.lang-select {
+  font: inherit; font-size: var(--fs-sm); font-weight: var(--fw-med);
+  padding: var(--s-2) var(--s-3);
+  background: var(--surface); color: var(--txt);
+  border: 1px solid var(--line); border-radius: var(--r);
+  cursor: pointer;
+}
+.lang-select:hover { border-color: var(--txt-mut); }
+.lang-select:focus { outline: none; border-color: var(--red); }
 
 /* --- Main / search --- */
 main { max-width: var(--maxw); margin: 0 auto; padding: var(--s-6) var(--s-5); }
