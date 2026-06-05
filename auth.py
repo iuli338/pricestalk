@@ -91,3 +91,13 @@ def login():
 def logout():
     logout_user()
     return jsonify({"ok": True})
+
+
+@auth_bp.route("/api/auth/account", methods=["DELETE"])
+@login_required
+def delete_account():
+    """Hard-delete the current user and all their data, then log out."""
+    uid = current_user.id
+    logout_user()
+    storage.delete_user(uid)
+    return jsonify({"ok": True})

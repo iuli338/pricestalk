@@ -245,3 +245,13 @@ def get_user_by_email(email):
     with SessionLocal() as s:
         user = s.scalars(select(User).where(User.email == email)).first()
         return _detach(s, user)
+
+
+def delete_user(user_id):
+    """Hard-delete a user and all their products/listings (cascade)."""
+    with SessionLocal.begin() as s:
+        user = s.get(User, user_id)
+        if not user:
+            return False
+        s.delete(user)
+        return True

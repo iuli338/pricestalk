@@ -33,6 +33,10 @@ def register_routes(app):
         # public — site owners must be able to read it without an account
         return render_template("disclaimer.html")
 
+    @app.route("/privacy")
+    def privacy():
+        return render_template("privacy.html")
+
     # ----------------------------------------------------------- wizard
 
     @app.route("/api/scout", methods=["POST"])

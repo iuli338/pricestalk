@@ -272,8 +272,14 @@
 .pf-label { color: var(--txt-mut); }
 .pf-value { font-weight: var(--fw-med); }
 
-.pf-footer { margin-top: var(--s-5); }
+.pf-footer { margin-top: var(--s-5); display: flex; flex-direction: column; gap: var(--s-2); }
 .pf-footer .btn { width: 100%; }
+/* discreet danger link for delete-account in the profile */
+.pf-delete {
+  border: none; background: none; color: var(--red);
+  font-size: var(--fs-sm); font-weight: var(--fw-med);
+}
+.pf-delete:hover { background: var(--tint); border-color: transparent; }
 
 /* --- Spinners --- */
 .spinner {

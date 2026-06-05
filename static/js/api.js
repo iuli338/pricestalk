@@ -38,6 +38,7 @@ export const api = {
   register:       (data)       => reqStatus('/api/auth/register', 'POST', data),
   login:          (email, pw)  => reqStatus('/api/auth/login', 'POST', { email, password: pw }),
   logout:         ()           => req('/api/auth/logout', 'POST'),
+  deleteAccount:  ()           => req('/api/auth/account', 'DELETE'),
   me:             ()           => reqStatus('/api/auth/me', 'GET'),
 
   // misc
