@@ -1,29 +1,31 @@
-# Fly.io config for PriceStalk.
-app = "pricestalk"
-primary_region = "cdg"   # Paris (closest EU region; Fly has no RO region)
+# fly.toml app configuration file generated for pricestalk on 2026-06-06T02:59:27+03:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'pricestalk'
+primary_region = 'cdg'
 
 [build]
 
 [env]
-  PORT = "8080"
-  DEBUG = "0"
-  RUN_SCHEDULER = "1"
-  REFRESH_HOURS = "24"
-  # SQLite lives on the persistent volume mounted at /data
-  DATABASE_URL = "sqlite:////data/pricestalk.db"
+  DATABASE_URL = 'sqlite:////data/pricestalk.db'
+  DEBUG = '0'
+  PORT = '8080'
+  REFRESH_HOURS = '24'
+  RUN_SCHEDULER = '1'
 
-# Persistent disk for the SQLite database (survives restarts/deploys).
-[mounts]
-  source = "pricestalk_data"
-  destination = "/data"
+[[mounts]]
+  source = 'pricestalk_data'
+  destination = '/data'
 
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = "stop"
+  auto_stop_machines = 'stop'
   auto_start_machines = true
   min_machines_running = 0
 
 [[vm]]
-  size = "shared-cpu-1x"
-  memory = "256mb"
+  size = 'shared-cpu-1x'
+  memory = '256mb'
