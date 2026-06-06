@@ -6,15 +6,14 @@ Responsibilities:
   - fetch_price(url): re-fetch current price/availability of a pinned URL.
 
 Methods (see study/FINDINGS.md):
-  - eMAG: server-rendered HTML, plain requests.
+  - eMAG: server-rendered HTML via curl_cffi (browser impersonation).
   - Altex: JSON API fenrir.altex.ro/v2/catalog/search via curl_cffi (TLS block).
-  - Compari: HTML, plain requests. Price-signal only (no real pinnable link).
+  - Compari: HTML via curl_cffi. Price-signal only (no real pinnable link).
 """
 import re
 import json
 from urllib.parse import quote_plus, quote, urlparse
 
-import requests
 from bs4 import BeautifulSoup
 from curl_cffi import requests as creq
 
@@ -27,6 +26,21 @@ HEADERS = {
     "Accept-Encoding": "gzip, deflate",  # no 'br' (brotli not guaranteed)
 }
 TIMEOUT = 20
+
+# A specific Chrome version impersonation passes Cloudflare (compari) where the
+# generic "chrome" alias is blocked; plain requests is blocked on datacenter IPs.
+IMPERSONATE = "chrome124"
+
+
+def _cffi_session():
+    """curl_cffi session impersonating a real browser (TLS + HTTP fingerprint)."""
+    s = creq.Session(impersonate=IMPERSONATE)
+    s.headers.update({
+        "User-Agent": UA,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "Accept-Language": "ro-RO,ro;q=0.9,en;q=0.8",
+    })
+    return s
 
 
 def _site_of(url):
@@ -53,16 +67,16 @@ def _parse_ron(text):
 
 
 # --------------------------------------------------------------------------
-# eMAG (HTML, plain requests)
+# eMAG (HTML via curl_cffi)
 # --------------------------------------------------------------------------
 
 def search_emag(query, limit=24):
     url = f"https://www.emag.ro/search/{quote_plus(query)}"
     out = []
     try:
-        r = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
+        r = _cffi_session().get(url, timeout=TIMEOUT)
         r.raise_for_status()
-    except requests.RequestException:
+    except Exception:
         return out
 
     soup = BeautifulSoup(r.text, "html.parser")
@@ -145,13 +159,12 @@ def search_altex(query, limit=24):
 def search_compari(query, limit=24):
     out = []
     try:
-        s = requests.Session()
-        s.headers.update(HEADERS)
+        s = _cffi_session()
         s.get("https://www.compari.ro/", timeout=TIMEOUT)  # warm Cloudflare cookies
         url = "https://www.compari.ro/CategorySearch.php?st=" + quote_plus(query)
         r = s.get(url, timeout=TIMEOUT)
         r.raise_for_status()
-    except requests.RequestException:
+    except Exception:
         return out
 
     soup = BeautifulSoup(r.text, "html.parser")
@@ -200,11 +213,11 @@ def fetch_price(url):
     if "altex.ro" in site:
         return _fetch_altex_price(url)
 
-    # eMAG / generic HTML.
+    # eMAG / generic HTML (browser impersonation to pass bot guards).
     try:
-        r = requests.get(url, headers=HEADERS, timeout=TIMEOUT)
+        r = _cffi_session().get(url, timeout=TIMEOUT)
         r.raise_for_status()
-    except requests.RequestException as e:
+    except Exception as e:
         return {"error": str(e), "available": False}
     soup = BeautifulSoup(r.text, "html.parser")
     title = soup.title.get_text(strip=True) if soup.title else None
